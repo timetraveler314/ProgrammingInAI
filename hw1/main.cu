@@ -18,7 +18,7 @@ int main() {
     std::cout << "Sigmoid of t1:" << std::endl;
     std::cout << t3 << std::endl << std::endl;
 
-    Tensor grad = random_gpu_tensor(t1.shape);
+    Tensor grad = random_gpu_tensor(t1.getShape());
     std::cout << "Upstream gradient:" << std::endl;
     std::cout << grad << std::endl << std::endl;
 
@@ -47,6 +47,7 @@ Tensor random_gpu_tensor(const std::vector<int>& shape) {
 
 Tensor get_test_neg1_1_tensor() {
     Tensor t1({2,3,4}, TensorDevice::CPU);
+
     t1.acceptModifier([](const DeviceSpace& space) {
         for (int i = 0; i < space.size; i++) {
             space.space[i] = 2 * ((double) i / space.size) - 1;

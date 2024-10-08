@@ -10,6 +10,8 @@
 #include <iomanip>
 #include <memory>
 
+#include <cuda_runtime.h>
+
 // Use 512 or 256 threads per block
 const int kCudaThreadsNum = 512;
 inline int CudaGetBlocks(const int N) {
@@ -109,7 +111,6 @@ public:
 };
 
 class Tensor {
-public:
     TensorDevice device;
     std::vector<int> shape;
     device_ptr data;
@@ -145,6 +146,8 @@ public:
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
+
+    std::vector<int> getShape() const;
 };
 
 namespace TensorKernel {

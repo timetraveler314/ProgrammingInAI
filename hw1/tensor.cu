@@ -114,6 +114,10 @@ void Tensor::print(std::ostream &os, const int depth, const int offset) const {
     }
 }
 
+std::vector<int> Tensor::getShape() const {
+    return this->shape;
+}
+
 std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
     tensor.print(os);
     return os;
