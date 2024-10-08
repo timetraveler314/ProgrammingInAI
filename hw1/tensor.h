@@ -119,6 +119,8 @@ public:
     Tensor(const Tensor& tensor);
     Tensor(Tensor&& tensor) = default;
 
+    static Tensor ones(std::vector<int> shape, TensorDevice device);
+
     // Nothing needed here. Data pointer will be freed automatically by
     // the shared_ptr managing DeviceSpace.
     ~Tensor() = default;
@@ -131,10 +133,12 @@ public:
 
     Tensor relu() const;
     Tensor sigmoid() const;
+    static Tensor relu_backward(const Tensor& input, const Tensor& grad);
+    static Tensor sigmoid_backward(const Tensor& tensor, const Tensor& grad);
     friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
     friend Tensor operator-(const Tensor& lhs, const Tensor& rhs);
     friend Tensor operator*(const Tensor& lhs, const Tensor& rhs);
-    friend Tensor operator*(const TensorDataType scalar, const Tensor& tensor);
+    friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
     friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
 
     void acceptModifier(const std::function<void(DeviceSpace&)> &modifier) const;
@@ -145,7 +149,9 @@ public:
 
 namespace TensorKernel {
     __global__ void relu_gpu(const TensorDataType* in, TensorDataType* out, int size);
+    __global__ void relu_backward_gpu(const TensorDataType* in, const TensorDataType *grad, TensorDataType* out, int size);
     __global__ void sigmoid_gpu(const TensorDataType* in, TensorDataType* out, int size);
+    // __global__ void sigmoid_backward_gpu(const TensorDataType* in, const TensorDataType *grad, TensorDataType* out, int size);
     __global__ void add_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
     __global__ void sub_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
     __global__ void pt_mul_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);

@@ -15,6 +15,21 @@ Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device
 
 Tensor::Tensor(const Tensor &tensor) : device(tensor.device), shape(tensor.shape), data(tensor.data) {}
 
+Tensor Tensor::ones(std::vector<int> shape, TensorDevice device) {
+    Tensor result(shape, TensorDevice::CPU);
+    for (int i = 0; i < result.size(); i++) {
+        result.data->space[i] = 1.0;
+    }
+
+    switch (device) {
+        case TensorDevice::CPU:
+            return result;
+        case TensorDevice::GPU:
+            return result.gpu();
+    }
+    return result;
+}
+
 Tensor Tensor::gpu() const {
     Tensor gpuTensor(shape, TensorDevice::GPU);
     gpuTensor.data = data.copy_to(TensorDevice::GPU);
@@ -256,9 +271,45 @@ Tensor Tensor::sigmoid() const {
     throw std::runtime_error("Unreachable code");
 }
 
+Tensor Tensor::relu_backward(const Tensor &input, const Tensor &grad) {
+    if (input.shape != grad.shape) {
+        throw std::runtime_error("Shapes do not match");
+    }
+
+    auto [device_result, input_unified, grad_unified] = Tensor::unifyDevice(input, grad);
+
+    Tensor result = Tensor(input_unified.shape, device_result);
+
+    switch (device_result) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < input_unified.size(); i++) {
+                result.data->space[i] = input.data->space[i] > 0 ? grad.data->space[i] : 0;
+            }
+        break;
+        case TensorDevice::GPU:
+            TensorKernel::relu_backward_gpu<<<CudaGetBlocks(input_unified.size()), kCudaThreadsNum>>>(input_unified.data->space, grad_unified.data->space, result.data->space, input_unified.size());
+            cudaDeviceSynchronize();
+        break;
+    }
+
+    return result;
+}
+
+Tensor Tensor::sigmoid_backward(const Tensor &x, const Tensor &grad) {
+    Tensor y = x.sigmoid();
+
+    return grad * y * (ones(x.shape, x.device) - y);
+}
+
 __global__ void TensorKernel::relu_gpu(const TensorDataType* in, TensorDataType* out, int size) {
     CUDA_KERNEL_LOOP(i, size) {
         out[i] = in[i] > 0 ? in[i] : 0;
+    }
+}
+
+__global__ void TensorKernel::relu_backward_gpu(const TensorDataType* in, const TensorDataType *grad, TensorDataType* out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = in[i] > 0 ? grad[i] : 0;
     }
 }
 
@@ -267,6 +318,12 @@ __global__ void TensorKernel::sigmoid_gpu(const TensorDataType *in, TensorDataTy
         out[i] = 1.0 / (1.0 + expf(-in[i]));
     }
 }
+
+// __global__ void TensorKernel::sigmoid_backward_gpu(const TensorDataType* in, const TensorDataType * grad, TensorDataType* out, int size) {
+//     CUDA_KERNEL_LOOP(i, size) {
+//         out[i] =
+//     }
+// }
 
 __global__ void TensorKernel::add_gpu(const TensorDataType *in1, const TensorDataType *in2, TensorDataType *out, int size) {
     CUDA_KERNEL_LOOP(i, size) {
