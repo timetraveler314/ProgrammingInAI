@@ -6,78 +6,26 @@
 
 Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device), shape(std::move(shape)) {
     int bufferSize = 1;
-    for (const auto dim : this->shape) {
+    for (const auto dim: this->shape) {
         bufferSize *= dim;
     }
 
-    switch (device) {
-        case TensorDevice::CPU:
-            data = new TensorDataType[bufferSize];
-            break;
-        case TensorDevice::GPU:
-            cudaMalloc(&data, bufferSize * sizeof(TensorDataType));
-            break;
-    }
+    this->data = device_ptr(device, bufferSize);
 }
 
-Tensor::Tensor(const Tensor &tensor) : device(tensor.device), shape(tensor.shape) {
-    int bufferSize = 1;
-    for (const auto dim : shape) {
-        bufferSize *= dim;
-    }
-
-    switch (device) {
-        case TensorDevice::CPU:
-            data = new TensorDataType[bufferSize];
-            memcpy(data, tensor.data, bufferSize * sizeof(TensorDataType));
-            break;
-        case TensorDevice::GPU:
-            cudaMalloc(&data, bufferSize * sizeof(TensorDataType));
-            cudaMemcpy(data, tensor.data, bufferSize * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
-            break;
-    }
-}
-
-Tensor::Tensor(Tensor &&tensor) : device(tensor.device), shape(std::move(tensor.shape)), data(tensor.data) {
-    tensor.data = nullptr;
-}
-
-Tensor::~Tensor() {
-    if (data) {
-        switch (device) {
-            case TensorDevice::CPU:
-                delete[] data;
-            break;
-            case TensorDevice::GPU:
-                cudaFree(data);
-            break;
-        }
-    }
-}
+Tensor::Tensor(const Tensor &tensor) : device(tensor.device), shape(tensor.shape), data(tensor.data) {}
 
 Tensor Tensor::gpu() const {
     Tensor gpuTensor(shape, TensorDevice::GPU);
-    switch (device) {
-        case TensorDevice::CPU:
-            cudaMemcpy(gpuTensor.data, data, size() * sizeof(TensorDataType), cudaMemcpyHostToDevice);
-        case TensorDevice::GPU:
-            cudaMemcpy(gpuTensor.data, data, size() * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
-    }
-
+    gpuTensor.data = data.copy_to(TensorDevice::GPU);
     return gpuTensor;
 }
 
 Tensor Tensor::cpu() const {
     Tensor cpuTensor(shape, TensorDevice::CPU);
-    switch (device) {
-        case TensorDevice::CPU:
-            memcpy(cpuTensor.data, data, size() * sizeof(TensorDataType));
-        case TensorDevice::GPU:
-            cudaMemcpy(cpuTensor.data, data, size() * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
-    }
+    cpuTensor.data = data.copy_to(TensorDevice::CPU);
     return cpuTensor;
 }
-
 
 int Tensor::size() const {
     int bufferSize = 1;
@@ -103,9 +51,9 @@ void Tensor::print(std::ostream &os, int depth, int offset) const {
         os << "[";
         for (int i = 0; i < shape[depth]; i++) {
             if (i == shape[depth] - 1) {
-                os << std::fixed << std::setprecision(8) << data[offset + i];
+                os << std::fixed << std::setprecision(8) << data->space[offset + i];
             } else {
-                os << std::fixed << std::setprecision(8) << data[offset + i] << ", ";
+                os << std::fixed << std::setprecision(8) << data->space[offset + i] << ", ";
             }
         }
         os << "]";
@@ -127,9 +75,7 @@ std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
 }
 
 Tensor operator+(const Tensor &t1, const Tensor &t2) {
-    if (t1.device == TensorDevice::GPU || t2.device == TensorDevice::GPU) {
 
-    }
 }
 
 Tensor Tensor::relu() const {
@@ -137,12 +83,12 @@ Tensor Tensor::relu() const {
     switch (device) {
         case TensorDevice::CPU: {
             for (int i = 0; i < size(); i++) {
-                result.data[i] = data[i] > 0 ? data[i] : 0;
+                result.data->space[i] = data->space[i] > 0 ? data->space[i] : 0;
             }
             return result;
         }
         case TensorDevice::GPU: {
-            TensorKernel::relu_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data, result.data, size());
+            TensorKernel::relu_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data->space, result.data->space, size());
             cudaDeviceSynchronize();
             return result;
         }
@@ -154,12 +100,12 @@ Tensor Tensor::sigmoid() const {
     switch (device) {
         case TensorDevice::CPU: {
             for (int i = 0; i < size(); i++) {
-                result.data[i] = 1.0 / (1.0 + exp(-data[i]));
+                result.data->space[i] = 1.0 / (1.0 + exp(-data->space[i]));
             }
             return result;
         }
         case TensorDevice::GPU: {
-            TensorKernel::sigmoid_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data, result.data, size());
+            TensorKernel::sigmoid_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data->space, result.data->space, size());
             cudaDeviceSynchronize();
             return result;
         }

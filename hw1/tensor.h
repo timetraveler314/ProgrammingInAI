@@ -27,17 +27,100 @@ enum class TensorDevice {
     GPU
 };
 
+struct DeviceSpace {
+    TensorDevice device;
+    TensorDataType* space;
+    size_t size;
+
+    DeviceSpace(TensorDevice device, size_t size) : device(device), space(nullptr), size(size) {
+        switch (device) {
+            case TensorDevice::CPU:
+                space = new TensorDataType[size];
+            break;
+            case TensorDevice::GPU:
+                cudaMalloc(&space, size * sizeof(TensorDataType));
+            break;
+        }
+    }
+
+    DeviceSpace(const DeviceSpace& deviceSpace) : device(device), space(nullptr), size(size) {
+        switch (deviceSpace.device) {
+            case TensorDevice::CPU:
+                space = new TensorDataType[size];
+                memcpy(space, deviceSpace.space, size * sizeof(TensorDataType));
+            break;
+            case TensorDevice::GPU:
+                cudaMalloc(&space, size * sizeof(TensorDataType));
+                cudaMemcpy(space, deviceSpace.space, size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+            break;
+        }
+    }
+
+    ~DeviceSpace() {
+        if (space)
+            switch (device) {
+                case TensorDevice::CPU:
+                    delete [] space;
+                break;
+                case TensorDevice::GPU:
+                    cudaFree(space);
+                break;
+            }
+    }
+};
+
+class device_ptr : public std::shared_ptr<DeviceSpace> {
+
+public:
+    device_ptr(TensorDevice device, size_t size) : std::shared_ptr<DeviceSpace>(std::make_shared<DeviceSpace>(device, size)) {}
+
+    device_ptr() = default;
+    device_ptr(const device_ptr&) = default;
+    device_ptr(device_ptr&&) = default;
+
+    device_ptr & operator=(const device_ptr&) = default;
+
+    device_ptr copy_to(const TensorDevice device) const {
+        const auto & self = *this;
+        auto result = device_ptr(device, self->size);
+
+        switch (device) {
+            case TensorDevice::CPU:
+                switch (self->device) {
+                    case TensorDevice::CPU:
+                        memcpy(result->space, self->space, self->size * sizeof(TensorDataType));
+                    case TensorDevice::GPU:
+                        cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+                }
+            break;
+            case TensorDevice::GPU:
+                switch (self->device) {
+                    case TensorDevice::CPU:
+                        cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyHostToDevice);
+                    case TensorDevice::GPU:
+                        cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+                }
+            break;
+        }
+
+        return result;
+    }
+};
+
 class Tensor {
 public:
     TensorDevice device;
     std::vector<int> shape;
-    TensorDataType* data;
+    device_ptr data;
 
 public:
     Tensor(std::vector<int> shape, TensorDevice device);
     Tensor(const Tensor& tensor);
-    Tensor(Tensor&& tensor);
-    ~Tensor();
+    Tensor(Tensor&& tensor) = default;
+
+    // Nothing needed here. Data pointer will be freed automatically by
+    // the shared_ptr managing DeviceSpace.
+    ~Tensor() = default;
 
     Tensor cpu() const;
     Tensor gpu() const;
@@ -49,6 +132,7 @@ public:
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
+    friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
 };
 
 namespace TensorKernel {
