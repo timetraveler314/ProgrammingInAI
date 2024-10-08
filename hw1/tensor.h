@@ -6,6 +6,8 @@
 #define TENSOR_H
 #include <vector>
 #include <iostream>
+#include <iomanip>
+#include <memory>
 
 // Use 512 or 256 threads per block
 const int kCudaThreadsNum = 512;
@@ -33,6 +35,8 @@ public:
 
 public:
     Tensor(std::vector<int> shape, TensorDevice device);
+    Tensor(const Tensor& tensor);
+    Tensor(Tensor&& tensor);
     ~Tensor();
 
     Tensor cpu() const;
@@ -40,13 +44,16 @@ public:
 
     int size() const;
 
-    void print(std::ostream& os, int depth = 0, int offset = 0) const;
-
     Tensor relu() const;
+    Tensor sigmoid() const;
+
+    void print(std::ostream& os, int depth = 0, int offset = 0) const;
+    friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
 };
 
 namespace TensorKernel {
     __global__ void relu_gpu(const TensorDataType* in, TensorDataType* out, int size);
+    __global__ void sigmoid_gpu(const TensorDataType* in, TensorDataType* out, int size);
 }
 
 

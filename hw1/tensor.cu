@@ -20,14 +20,38 @@ Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device
     }
 }
 
-Tensor::~Tensor() {
+Tensor::Tensor(const Tensor &tensor) : device(tensor.device), shape(tensor.shape) {
+    int bufferSize = 1;
+    for (const auto dim : shape) {
+        bufferSize *= dim;
+    }
+
     switch (device) {
         case TensorDevice::CPU:
-            delete[] data;
+            data = new TensorDataType[bufferSize];
+            memcpy(data, tensor.data, bufferSize * sizeof(TensorDataType));
             break;
         case TensorDevice::GPU:
-            cudaFree(data);
+            cudaMalloc(&data, bufferSize * sizeof(TensorDataType));
+            cudaMemcpy(data, tensor.data, bufferSize * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
             break;
+    }
+}
+
+Tensor::Tensor(Tensor &&tensor) : device(tensor.device), shape(std::move(tensor.shape)), data(tensor.data) {
+    tensor.data = nullptr;
+}
+
+Tensor::~Tensor() {
+    if (data) {
+        switch (device) {
+            case TensorDevice::CPU:
+                delete[] data;
+            break;
+            case TensorDevice::GPU:
+                cudaFree(data);
+            break;
+        }
     }
 }
 
@@ -79,9 +103,9 @@ void Tensor::print(std::ostream &os, int depth, int offset) const {
         os << "[";
         for (int i = 0; i < shape[depth]; i++) {
             if (i == shape[depth] - 1) {
-                os << data[offset + i];
+                os << std::fixed << std::setprecision(8) << data[offset + i];
             } else {
-                os << data[offset + i] << ", ";
+                os << std::fixed << std::setprecision(8) << data[offset + i] << ", ";
             }
         }
         os << "]";
@@ -97,6 +121,17 @@ void Tensor::print(std::ostream &os, int depth, int offset) const {
     }
 }
 
+std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
+    tensor.print(os);
+    return os;
+}
+
+Tensor operator+(const Tensor &t1, const Tensor &t2) {
+    if (t1.device == TensorDevice::GPU || t2.device == TensorDevice::GPU) {
+
+    }
+}
+
 Tensor Tensor::relu() const {
     Tensor result(shape, device);
     switch (device) {
@@ -108,6 +143,24 @@ Tensor Tensor::relu() const {
         }
         case TensorDevice::GPU: {
             TensorKernel::relu_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data, result.data, size());
+            cudaDeviceSynchronize();
+            return result;
+        }
+    }
+}
+
+Tensor Tensor::sigmoid() const {
+    Tensor result(shape, device);
+    switch (device) {
+        case TensorDevice::CPU: {
+            for (int i = 0; i < size(); i++) {
+                result.data[i] = 1.0 / (1.0 + exp(-data[i]));
+            }
+            return result;
+        }
+        case TensorDevice::GPU: {
+            TensorKernel::sigmoid_gpu<<<CudaGetBlocks(size()), kCudaThreadsNum>>>(data, result.data, size());
+            cudaDeviceSynchronize();
             return result;
         }
     }
@@ -116,5 +169,11 @@ Tensor Tensor::relu() const {
 __global__ void TensorKernel::relu_gpu(const TensorDataType* in, TensorDataType* out, int size) {
     CUDA_KERNEL_LOOP(i, size) {
         out[i] = in[i] > 0 ? in[i] : 0;
+    }
+}
+
+__global__ void TensorKernel::sigmoid_gpu(const TensorDataType *in, TensorDataType *out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = 1.0 / (1.0 + expf(-in[i]));
     }
 }

@@ -8,10 +8,10 @@ int main() {
         t.data[i] = 2.0 * (rand() / (double)RAND_MAX) - 1.0;
     }
 
-    Tensor g = t.gpu();
-    Tensor h = g.relu();
+    Tensor g = std::move(t.gpu());
+    Tensor h = g.sigmoid();
 
-    h.print(std::cout);
+    std::cout << h;
 
     return 0;
 }
