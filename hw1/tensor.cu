@@ -21,6 +21,32 @@ Tensor Tensor::gpu() const {
     return gpuTensor;
 }
 
+std::tuple<TensorDevice, Tensor, Tensor> Tensor::unifyDevice(const Tensor &lhs, const Tensor &rhs) {
+    if (lhs.device == TensorDevice::GPU || rhs.device == TensorDevice::GPU) {
+        switch (lhs.device) {
+            case TensorDevice::CPU: {
+                Tensor lhsGpu = lhs.gpu();
+                return {TensorDevice::GPU, lhsGpu, rhs};
+            }
+            case TensorDevice::GPU: {
+                switch (rhs.device) {
+                    case TensorDevice::CPU: {
+                        Tensor rhsGpu = rhs.gpu();
+                        return {TensorDevice::GPU, lhs, rhsGpu};
+                    }
+                    case TensorDevice::GPU: {
+                        return {TensorDevice::GPU, lhs, rhs};
+                    }
+                }
+            }
+        }
+    } else {
+        return {TensorDevice::CPU, lhs, rhs};
+    }
+
+    throw std::runtime_error("Unreachable code");
+}
+
 Tensor Tensor::cpu() const {
     Tensor cpuTensor(shape, TensorDevice::CPU);
     cpuTensor.data = data.copy_to(TensorDevice::CPU);
@@ -35,7 +61,11 @@ int Tensor::size() const {
     return bufferSize;
 }
 
-void Tensor::print(std::ostream &os, int depth, int offset) const {
+void Tensor::acceptModifier(const std::function<void(DeviceSpace &)> &modifier) const {
+    modifier(*data);
+}
+
+void Tensor::print(std::ostream &os, const int depth, const int offset) const {
     if (device == TensorDevice::GPU) {
         Tensor cpuTensor = cpu();
         cpuTensor.print(os, depth, offset);
@@ -75,7 +105,117 @@ std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
 }
 
 Tensor operator+(const Tensor &t1, const Tensor &t2) {
+    if (t1.shape != t2.shape) {
+        throw std::runtime_error("Shapes do not match");
+    }
 
+    auto [device_result, t1_unified, t2_unified] = Tensor::unifyDevice(t1, t2);
+
+    Tensor result = Tensor(t1_unified.shape, device_result);
+
+    switch (device_result) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < t1_unified.size(); i++) {
+                result.data->space[i] = t1_unified.data->space[i] + t2_unified.data->space[i];
+            }
+            break;
+        case TensorDevice::GPU:
+            TensorKernel::add_gpu<<<CudaGetBlocks(t1_unified.size()), kCudaThreadsNum>>>(t1_unified.data->space, t2_unified.data->space, result.data->space, t1_unified.size());
+            cudaDeviceSynchronize();
+            break;
+    }
+
+    return result;
+}
+
+Tensor operator-(const Tensor &t1, const Tensor &t2) {
+    if (t1.shape != t2.shape) {
+        throw std::runtime_error("Shapes do not match");
+    }
+
+    auto [device_result, t1_unified, t2_unified] = Tensor::unifyDevice(t1, t2);
+
+    Tensor result = Tensor(t1_unified.shape, device_result);
+
+    switch (device_result) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < t1_unified.size(); i++) {
+                result.data->space[i] = t1_unified.data->space[i] - t2_unified.data->space[i];
+            }
+        break;
+        case TensorDevice::GPU:
+            TensorKernel::sub_gpu<<<CudaGetBlocks(t1_unified.size()), kCudaThreadsNum>>>(t1_unified.data->space, t2_unified.data->space, result.data->space, t1_unified.size());
+        cudaDeviceSynchronize();
+        break;
+    }
+
+    return result;
+}
+
+Tensor operator*(const Tensor &t1, const Tensor &t2) {
+    if (t1.shape != t2.shape) {
+        throw std::runtime_error("Shapes do not match");
+    }
+
+    auto [device_result, t1_unified, t2_unified] = Tensor::unifyDevice(t1, t2);
+
+    Tensor result = Tensor(t1_unified.shape, device_result);
+
+    switch (device_result) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < t1_unified.size(); i++) {
+                result.data->space[i] = t1_unified.data->space[i] * t2_unified.data->space[i];
+            }
+        break;
+        case TensorDevice::GPU:
+            TensorKernel::pt_mul_gpu<<<CudaGetBlocks(t1_unified.size()), kCudaThreadsNum>>>(t1_unified.data->space, t2_unified.data->space, result.data->space, t1_unified.size());
+        cudaDeviceSynchronize();
+        break;
+    }
+
+    return result;
+}
+
+Tensor operator*(const TensorDataType scalar, const Tensor &tensor) {
+    Tensor result = Tensor(tensor.shape, tensor.device);
+
+    switch (tensor.device) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < tensor.size(); i++) {
+                result.data->space[i] = scalar * tensor.data->space[i];
+            }
+            break;
+        case TensorDevice::GPU:
+            TensorKernel::scalar_mul_gpu<<<CudaGetBlocks(tensor.size()), kCudaThreadsNum>>>(scalar, tensor.data->space, result.data->space, tensor.size());
+            cudaDeviceSynchronize();
+            break;
+    }
+
+    return result;
+}
+
+Tensor operator/(const Tensor &t1, const Tensor &t2) {
+    if (t1.shape != t2.shape) {
+        throw std::runtime_error("Shapes do not match");
+    }
+
+    auto [device_result, t1_unified, t2_unified] = Tensor::unifyDevice(t1, t2);
+
+    Tensor result = Tensor(t1_unified.shape, device_result);
+
+    switch (device_result) {
+        case TensorDevice::CPU:
+            for (int i = 0; i < t1_unified.size(); i++) {
+                result.data->space[i] = t1_unified.data->space[i] / t2_unified.data->space[i];
+            }
+        break;
+        case TensorDevice::GPU:
+            TensorKernel::div_gpu<<<CudaGetBlocks(t1_unified.size()), kCudaThreadsNum>>>(t1_unified.data->space, t2_unified.data->space, result.data->space, t1_unified.size());
+            cudaDeviceSynchronize();
+        break;
+    }
+
+    return result;
 }
 
 Tensor Tensor::relu() const {
@@ -93,6 +233,8 @@ Tensor Tensor::relu() const {
             return result;
         }
     }
+
+    throw std::runtime_error("Unreachable code");
 }
 
 Tensor Tensor::sigmoid() const {
@@ -110,6 +252,8 @@ Tensor Tensor::sigmoid() const {
             return result;
         }
     }
+
+    throw std::runtime_error("Unreachable code");
 }
 
 __global__ void TensorKernel::relu_gpu(const TensorDataType* in, TensorDataType* out, int size) {
@@ -121,5 +265,36 @@ __global__ void TensorKernel::relu_gpu(const TensorDataType* in, TensorDataType*
 __global__ void TensorKernel::sigmoid_gpu(const TensorDataType *in, TensorDataType *out, int size) {
     CUDA_KERNEL_LOOP(i, size) {
         out[i] = 1.0 / (1.0 + expf(-in[i]));
+    }
+}
+
+__global__ void TensorKernel::add_gpu(const TensorDataType *in1, const TensorDataType *in2, TensorDataType *out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = in1[i] + in2[i];
+    }
+}
+
+__global__ void TensorKernel::sub_gpu(const TensorDataType *in1, const TensorDataType *in2, TensorDataType *out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = in1[i] - in2[i];
+    }
+}
+
+__global__ void TensorKernel::pt_mul_gpu(const TensorDataType *in1, const TensorDataType *in2, TensorDataType *out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = in1[i] * in2[i];
+    }
+}
+
+__global__ void TensorKernel::scalar_mul_gpu(const TensorDataType scalar, const TensorDataType *in, TensorDataType *out,
+    int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = scalar * in[i];
+    }
+}
+
+__global__ void TensorKernel::div_gpu(const TensorDataType *in1, const TensorDataType *in2, TensorDataType *out, int size) {
+    CUDA_KERNEL_LOOP(i, size) {
+        out[i] = in1[i] / in2[i];
     }
 }

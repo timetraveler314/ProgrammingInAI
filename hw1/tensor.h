@@ -6,6 +6,7 @@
 #define TENSOR_H
 #include <vector>
 #include <iostream>
+#include <functional>
 #include <iomanip>
 #include <memory>
 
@@ -124,20 +125,32 @@ public:
 
     Tensor cpu() const;
     Tensor gpu() const;
+    static std::tuple<TensorDevice, Tensor, Tensor> unifyDevice(const Tensor& lhs, const Tensor& rhs);
 
     int size() const;
 
     Tensor relu() const;
     Tensor sigmoid() const;
+    friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
+    friend Tensor operator-(const Tensor& lhs, const Tensor& rhs);
+    friend Tensor operator*(const Tensor& lhs, const Tensor& rhs);
+    friend Tensor operator*(const TensorDataType scalar, const Tensor& tensor);
+    friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
+
+    void acceptModifier(const std::function<void(DeviceSpace&)> &modifier) const;
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
-    friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
 };
 
 namespace TensorKernel {
     __global__ void relu_gpu(const TensorDataType* in, TensorDataType* out, int size);
     __global__ void sigmoid_gpu(const TensorDataType* in, TensorDataType* out, int size);
+    __global__ void add_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
+    __global__ void sub_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
+    __global__ void pt_mul_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
+    __global__ void scalar_mul_gpu(const TensorDataType scalar, const TensorDataType* in, TensorDataType* out, int size);
+    __global__ void div_gpu(const TensorDataType* in1, const TensorDataType* in2, TensorDataType* out, int size);
 }
 
 
