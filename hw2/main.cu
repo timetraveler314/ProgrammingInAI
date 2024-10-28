@@ -1,8 +1,12 @@
+#include <iostream>
+
 #include "tensor.h"
 #include "tensor_kernel.h"
 #include <thrust/functional.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+
+#include "tensornn.cuh"
 
 Tensor random_gpu_tensor(const std::vector<int>& shape);
 Tensor get_test_neg1_1_tensor();
@@ -32,7 +36,7 @@ int main() {
     std::cout << "W: " << w << std::endl;
     std::cout << "B: " << b << std::endl;
 
-    auto result = forward_fc(xg, wg, bg);
+    auto result = TensorNN::forward_fc(xg, wg, bg);
 
     std::cout << "Result: " << result << std::endl;
 
