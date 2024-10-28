@@ -21,7 +21,6 @@ for (int i = blockIdx.x * blockDim.x + threadIdx.x; \
     i < (n); \
     i += blockDim.x * gridDim.x)
 
-
 namespace tensor_kernel {
     inline void gemm_row_major_gpu(const cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
                         const int m, const int n, const int k, const TensorDataType alpha, const TensorDataType beta,
@@ -73,7 +72,7 @@ namespace tensor_kernel {
         //             C, n);
     }
 
-    inline __global__ void ones_kernel(TensorDataType* data, size_t size) {
+    __global__ void ones_kernel(TensorDataType* data, size_t size) {
         CUDA_KERNEL_LOOP(i, size) {
             data[i] = 1.0;
         }

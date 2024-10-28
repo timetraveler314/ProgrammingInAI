@@ -6,17 +6,19 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 
+#include "global_curand_generator.cuh"
 #include "tensornn.cuh"
 
-Tensor random_gpu_tensor(const std::vector<int>& shape);
 Tensor get_test_neg1_1_tensor();
 
 int main() {
-    srand(42); // seed random number generator to allow for reproducing the results.
-
     auto x = Tensor({2, 3}, TensorDevice::CPU);
     auto w = Tensor({4, 3}, TensorDevice::CPU);
     auto b = Tensor({4}, TensorDevice::CPU);
+
+    auto rand_tensor1 = Tensor::uniform({2,3,4}, TensorDevice::CPU);
+
+    std::cout << rand_tensor1 << std::endl;
 
     for (int i = 0; i < x.size(); i++) {
         x.data->space[i] = i;
@@ -45,6 +47,10 @@ int main() {
     std::cout << "dx: " << dx << std::endl;
     std::cout << "dw: " << dw << std::endl;
     std::cout << "db: " << db << std::endl;
+
+    auto rand_tensor = Tensor::uniform({2,3,4}, TensorDevice::GPU);
+
+    std::cout << rand_tensor << std::endl;
 
     return 0;
 }

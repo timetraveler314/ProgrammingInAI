@@ -7,12 +7,9 @@
 #include <vector>
 #include <iomanip>
 
-#include <cuda_runtime.h>
 #include <functional>
 
 #include "device_space.h"
-
-namespace TensorNN {}
 
 class Tensor {
 public:
@@ -37,6 +34,7 @@ public:
     Tensor(Tensor&& tensor) = default;
 
     static Tensor ones(std::vector<int> shape, TensorDevice device);
+    static Tensor uniform(std::vector<int> shape, TensorDevice device, TensorDataType low = 0.0f, TensorDataType high = 1.0f);
 
     // Nothing needed here. Data pointer will be freed automatically by
     // the shared_ptr managing DeviceSpace.

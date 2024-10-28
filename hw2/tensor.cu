@@ -4,6 +4,8 @@
 
 #include "tensor.h"
 
+#include "global_curand_generator.cuh"
+
 Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device), shape(std::move(shape)) {
     int bufferSize = 1;
     for (const auto dim: this->shape) {
@@ -28,6 +30,21 @@ Tensor Tensor::ones(std::vector<int> shape, TensorDevice device) {
             return result.gpu();
     }
     return result;
+}
+
+Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device, TensorDataType low, TensorDataType high) {
+    if (device == TensorDevice::CPU) {
+        Tensor resultCPU(shape, TensorDevice::CPU);
+        for (int i = 0; i < resultCPU.size(); i++) {
+            resultCPU.getRawData()[i] = low + static_cast<TensorDataType>(rand()) / RAND_MAX * (high - low);
+        }
+        return resultCPU;
+    } else {
+        Tensor resultGPU(shape, TensorDevice::GPU);
+        // Use cuRAND
+        curandGenerateUniform(global_curand_generator::get_instance(), resultGPU.getRawData(), resultGPU.size());
+        return resultGPU;
+    }
 }
 
 Tensor Tensor::gpu() const {
