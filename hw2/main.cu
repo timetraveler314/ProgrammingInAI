@@ -40,6 +40,12 @@ int main() {
 
     std::cout << "Result: " << result << std::endl;
 
+    auto [dx, dw, db] = TensorNN::backward_fc(get_test_neg1_1_tensor(), xg, wg);
+
+    std::cout << "dx: " << dx << std::endl;
+    std::cout << "dw: " << dw << std::endl;
+    std::cout << "db: " << db << std::endl;
+
     return 0;
 }
 
@@ -51,7 +57,11 @@ Tensor random_gpu_tensor(const std::vector<int>& shape) {
 }
 
 Tensor get_test_neg1_1_tensor() {
-    Tensor t1({2,3}, TensorDevice::CPU);
+    Tensor t1({2,4}, TensorDevice::CPU);
+
+    for (int i = 0; i < t1.size(); i++) {
+        t1.data->space[i] = i % 2 == 0 ? -1 : 1;
+    }
 
     return t1.gpu();
 }
