@@ -13,17 +13,21 @@ device_ptr device_ptr::copy_to(const TensorDevice device) const {
         case TensorDevice::CPU:
             switch (self->device) {
                 case TensorDevice::CPU:
-                    memcpy(result->space, *self, self->size * sizeof(TensorDataType));
+                    memcpy(result->space, self->space, self->size * sizeof(TensorDataType));
+                    break;
                 case TensorDevice::GPU:
-                    cudaMemcpy(result->space, *self, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+                    cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+                    break;
             }
             break;
         case TensorDevice::GPU:
             switch (self->device) {
                 case TensorDevice::CPU:
-                    cudaMemcpy(result->space, *self, self->size * sizeof(TensorDataType), cudaMemcpyHostToDevice);
+                    cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyHostToDevice);
+                    break;
                 case TensorDevice::GPU:
-                    cudaMemcpy(result->space, *self, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+                    cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+                    break;
             }
             break;
     }
@@ -62,32 +66,32 @@ Tensor Tensor::gpu() const {
     gpuTensor.data = data.copy_to(TensorDevice::GPU);
     return gpuTensor;
 }
-
-std::tuple<TensorDevice, Tensor, Tensor> Tensor::unifyDevice(const Tensor &lhs, const Tensor &rhs) {
-    if (lhs.device == TensorDevice::GPU || rhs.device == TensorDevice::GPU) {
-        switch (lhs.device) {
-            case TensorDevice::CPU: {
-                Tensor lhsGpu = lhs.gpu();
-                return {TensorDevice::GPU, lhsGpu, rhs};
-            }
-            case TensorDevice::GPU: {
-                switch (rhs.device) {
-                    case TensorDevice::CPU: {
-                        Tensor rhsGpu = rhs.gpu();
-                        return {TensorDevice::GPU, lhs, rhsGpu};
-                    }
-                    case TensorDevice::GPU: {
-                        return {TensorDevice::GPU, lhs, rhs};
-                    }
-                }
-            }
-        }
-    } else {
-        return {TensorDevice::CPU, lhs, rhs};
-    }
-
-    throw std::runtime_error("Unreachable code");
-}
+//
+// std::tuple<TensorDevice, Tensor, Tensor> Tensor::unifyDevice(const Tensor &lhs, const Tensor &rhs) {
+//     if (lhs.device == TensorDevice::GPU || rhs.device == TensorDevice::GPU) {
+//         switch (lhs.device) {
+//             case TensorDevice::CPU: {
+//                 Tensor lhsGpu = lhs.gpu();
+//                 return {TensorDevice::GPU, lhsGpu, rhs};
+//             }
+//             case TensorDevice::GPU: {
+//                 switch (rhs.device) {
+//                     case TensorDevice::CPU: {
+//                         Tensor rhsGpu = rhs.gpu();
+//                         return {TensorDevice::GPU, lhs, rhsGpu};
+//                     }
+//                     case TensorDevice::GPU: {
+//                         return {TensorDevice::GPU, lhs, rhs};
+//                     }
+//                 }
+//             }
+//         }
+//     } else {
+//         return {TensorDevice::CPU, lhs, rhs};
+//     }
+//
+//     throw std::runtime_error("Unreachable code");
+// }
 
 Tensor Tensor::cpu() const {
     Tensor cpuTensor(shape, TensorDevice::CPU);
@@ -144,4 +148,31 @@ std::vector<int> Tensor::getShape() const {
 std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
     tensor.print(os);
     return os;
+}
+
+Tensor forward_fc(const Tensor &input, const Tensor &weight, const Tensor &bias) {
+    // Shape check
+    if (input.getShape().size() != 2 || weight.getShape().size() != 2 || bias.getShape().size() != 1) {
+        throw std::runtime_error("Invalid shape for forward_fc");
+    }
+
+    const int N = input.getShape()[0];
+    const int Cin = input.getShape()[1];
+    const int Cout = weight.getShape()[0];
+
+    if (Cin != weight.getShape()[1] || Cout != bias.getShape()[0]) {
+        throw std::runtime_error("Invalid shape for forward_fc");
+    }
+
+    auto [device, x, w, b] = Tensor::unifyDevice(input, weight, bias);
+
+    if (device != TensorDevice::GPU) {
+        throw std::runtime_error("Unimplemented device for forward_fc");
+    }
+
+    Tensor y({N, Cout}, TensorDevice::GPU);
+
+    tensor_kernel::forward_fc_kernel_gpu(*x.data, *w.data, *b.data, *y.data, N, Cin, Cout);
+
+    return y;
 }

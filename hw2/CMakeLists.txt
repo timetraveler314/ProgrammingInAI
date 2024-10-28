@@ -8,3 +8,5 @@ add_executable(hw2 main.cu tensor.cu
 
 set_target_properties(hw2 PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
+
+target_link_libraries(hw2 PRIVATE cublas)
