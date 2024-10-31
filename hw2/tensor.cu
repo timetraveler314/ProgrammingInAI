@@ -32,6 +32,14 @@ Tensor Tensor::ones(std::vector<int> shape, TensorDevice device) {
     return result;
 }
 
+Tensor Tensor::iota(std::vector<int> shape, TensorDevice device) {
+    Tensor result(shape, TensorDevice::CPU);
+    for (int i = 0; i < result.size(); i++) {
+        result.data->space[i] = i;
+    }
+    return device == TensorDevice::CPU ? result : result.gpu();
+}
+
 Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device, TensorDataType low, TensorDataType high) {
     if (device == TensorDevice::CPU) {
         Tensor resultCPU(shape, TensorDevice::CPU);
@@ -51,6 +59,10 @@ Tensor Tensor::gpu() const {
     Tensor gpuTensor(shape, TensorDevice::GPU);
     gpuTensor.data = data.copy_to(TensorDevice::GPU);
     return gpuTensor;
+}
+
+TensorDevice Tensor::getDevice() const {
+    return device;
 }
 
 TensorDataType * Tensor::getRawData() const {
@@ -103,6 +115,12 @@ void Tensor::print(std::ostream &os, const int depth, const int offset) const {
         }
         os << "]";
     }
+}
+
+std::string Tensor::toString() const {
+    std::stringstream ss;
+    print(ss);
+    return ss.str();
 }
 
 std::vector<int> Tensor::getShape() const {

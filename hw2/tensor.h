@@ -12,7 +12,6 @@
 #include "device_space.h"
 
 class Tensor {
-public:
     TensorDevice device;
     std::vector<int> shape;
     device_ptr data;
@@ -34,6 +33,7 @@ public:
     Tensor(Tensor&& tensor) = default;
 
     static Tensor ones(std::vector<int> shape, TensorDevice device);
+    static Tensor iota(std::vector<int> shape, TensorDevice device);
     static Tensor uniform(std::vector<int> shape, TensorDevice device, TensorDataType low = 0.0f, TensorDataType high = 1.0f);
 
     // Nothing needed here. Data pointer will be freed automatically by
@@ -44,6 +44,9 @@ public:
 
     Tensor cpu() const;
     Tensor gpu() const;
+
+    TensorDevice getDevice() const;
+
     template <typename... Tensors>
     static auto unifyDevice(const Tensors&... tensors) {
         bool hasGpu = ((tensors.device == TensorDevice::GPU) || ...);
@@ -62,6 +65,8 @@ public:
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);
+
+    std::string toString() const;
 
     std::vector<int> getShape() const;
 };

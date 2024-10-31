@@ -12,37 +12,24 @@
 Tensor get_test_neg1_1_tensor();
 
 int main() {
-    auto x = Tensor({2, 3}, TensorDevice::CPU);
-    auto w = Tensor({4, 3}, TensorDevice::CPU);
-    auto b = Tensor({4}, TensorDevice::CPU);
+    auto x = Tensor::iota({2, 3}, TensorDevice::GPU);
+    auto w = Tensor::iota({4, 3}, TensorDevice::GPU);
+    auto b = Tensor::iota({4}, TensorDevice::GPU);
 
-    auto rand_tensor1 = Tensor::uniform({2,3,4}, TensorDevice::CPU);
-
-    std::cout << rand_tensor1 << std::endl;
-
-    for (int i = 0; i < x.size(); i++) {
-        x.data->space[i] = i;
-    }
-    for (int i = 0; i < w.size(); i++) {
-        w.data->space[i] = i;
-    }
-    for (int i = 0; i < b.size(); i++) {
-       b.data->space[i] = i;
-    }
-
-    auto xg = x.gpu();
-    auto wg = w.gpu();
-    auto bg = b.gpu();
+    // auto y = Tensor({2,3}, TensorDevice::GPU);
+    // cuda::std::span<float> x_span(x.getRawData(), x.size());
+    // cuda::std::span<float> y_span(y.getRawData(), y.size());
+    // tensor_kernel::forward_softmax_kernel_gpu(x_span,y_span,2,3);
 
     std::cout << "X: " << x << std::endl;
     std::cout << "W: " << w << std::endl;
     std::cout << "B: " << b << std::endl;
 
-    auto result = TensorNN::forward_fc(xg, wg, bg);
+    auto result = TensorNN::forward_fc(x, w, b);
 
     std::cout << "Result: " << result << std::endl;
 
-    auto [dx, dw, db] = TensorNN::backward_fc(get_test_neg1_1_tensor(), xg, wg);
+    auto [dx, dw, db] = TensorNN::backward_fc(get_test_neg1_1_tensor(), x, w);
 
     std::cout << "dx: " << dx << std::endl;
     std::cout << "dw: " << dw << std::endl;
@@ -66,7 +53,7 @@ Tensor get_test_neg1_1_tensor() {
     Tensor t1({2,4}, TensorDevice::CPU);
 
     for (int i = 0; i < t1.size(); i++) {
-        t1.data->space[i] = i % 2 == 0 ? -1 : 1;
+        t1.getRawData()[i] = i % 2 == 0 ? -1 : 1;
     }
 
     return t1.gpu();

@@ -9,6 +9,10 @@
 
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include <cuda/std/span>
+
+#include <thrust/transform.h>
+#include <thrust/execution_policy.h>
 
 // Use 512 or 256 threads per block
 constexpr int kCudaThreadsNum = 512;
@@ -159,6 +163,13 @@ namespace tensor_kernel {
         cudaDeviceSynchronize();
         cublasDestroy(handle);
         cudaFree(ones);
+    }
+
+    inline void forward_softmax_kernel_gpu(cuda::std::span<const TensorDataType> input, cuda::std::span<TensorDataType> output, size_t batch_size, size_t num_classes) {
+        // thrust::transform(thrust::device, input.begin(), input.end(), output.begin(),
+        //     [=] __device__ (TensorDataType x) {
+        //         return exp(x);
+        //     });
     }
 };
 
