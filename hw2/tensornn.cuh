@@ -78,6 +78,54 @@ namespace TensorNN {
 
         return y;
     }
+
+    inline TensorDataType cross_entropy(const Tensor &input, const Tensor &ground_truth) {
+        if (input.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
+            throw std::runtime_error("Invalid shape for cross_entropy");
+        }
+
+        const int N = input.getShape()[0];
+        const int C = input.getShape()[1];
+
+        auto [device, x, gt] = Tensor::unifyDevice(input, ground_truth);
+
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for cross_entropy");
+        }
+
+        TensorDataType *d_output_loss;
+        cudaMalloc(&d_output_loss, sizeof(TensorDataType));
+        cudaMemset(d_output_loss, 0, sizeof(TensorDataType));
+
+        tensor_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), d_output_loss, N, C);
+
+        TensorDataType output_loss = 0.0f;
+        cudaMemcpy(&output_loss, d_output_loss, sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+        cudaFree(d_output_loss);
+
+        return output_loss;
+    }
+
+    // The `input` argument here is the output of the softmax layer.
+    inline Tensor backward_softmax_cross_entropy(const Tensor &input, const Tensor &ground_truth) {
+        if (input.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
+            throw std::runtime_error("Invalid shape for backward_softmax_cross_entropy");
+        }
+
+        const int N = input.getShape()[0];
+        const int C = input.getShape()[1];
+
+        auto [device, x, gt] = Tensor::unifyDevice(input, ground_truth);
+
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for backward_softmax_cross_entropy");
+        }
+
+        Tensor dx({N, C}, TensorDevice::GPU);
+        tensor_kernel::backward_softmax_cross_entropy_kernel_gpu<<<CudaGetBlocks(N * C), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), dx.getRawData(), N, C);
+
+        return dx;
+    }
 }
 
 #endif //TENSORNN_CUH

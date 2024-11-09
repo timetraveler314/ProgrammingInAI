@@ -179,6 +179,29 @@ namespace tensor_kernel {
                 [normalizer] __device__ (TensorDataType val) { return val / normalizer; });
         }
     }
+
+    __global__ void cross_entropy_kernel_gpu(TensorDataType *input, TensorDataType *target, TensorDataType * output_loss, size_t batch_size, size_t num_classes) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i < batch_size) {
+            int label = static_cast<int>(target[i]);
+            TensorDataType my_loss = 0.0;
+            if (label >= 0 && label < num_classes) {
+                my_loss = -log(input[i * num_classes + label] + 1e-8);
+            }
+
+            atomicAdd(output_loss, my_loss / batch_size);
+        }
+    }
+
+    __global__ void backward_softmax_cross_entropy_kernel_gpu(TensorDataType *softmax_input, TensorDataType *target, TensorDataType *output_grad, size_t batch_size, size_t num_classes) {
+        int i = blockIdx.x * blockDim.x + threadIdx.x;
+        if (i >= batch_size * num_classes) return;
+
+        int sample_idx = i / num_classes;
+        int class_idx = i % num_classes;
+
+        output_grad[i] = softmax_input[i] - (target[sample_idx] == class_idx);
+    }
 };
 
 

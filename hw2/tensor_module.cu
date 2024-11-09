@@ -61,4 +61,6 @@ PYBIND11_MODULE(Genshin, m) {
     nn.def("forward_fc", &TensorNN::forward_fc);
     nn.def("backward_fc", &TensorNN::backward_fc);
     nn.def("forward_softmax", &TensorNN::forward_softmax);
+    nn.def("cross_entropy", &TensorNN::cross_entropy);
+    nn.def("backward_softmax_cross_entropy", &TensorNN::backward_softmax_cross_entropy);
 }
