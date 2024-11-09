@@ -59,6 +59,62 @@ namespace TensorNN {
         return {dx, dw, db};
     }
 
+    inline Tensor forward_max_pooling_2x2(const Tensor &input) {
+        if (input.getShape().size() != 4) {
+            throw std::runtime_error("Invalid shape for forward_max_pooling_2x2");
+        }
+
+        const int N = input.getShape()[0];
+        const int C = input.getShape()[1];
+        const int H = input.getShape()[2];
+        const int W = input.getShape()[3];
+
+        auto [device, x] = Tensor::unifyDevice(input);
+
+        Tensor y({N, C, H / 2, W / 2}, TensorDevice::GPU);
+
+        cudaMemset(y.getRawData(), 0, y.size() * sizeof(TensorDataType));
+
+        for (int i = 0; i < N; i++) {
+            tensor_kernel::forward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(x.getRawData() + i * C * H * W, y.getRawData() + i * C * H / 2 * W / 2, C, H, W);
+        }
+
+        return y;
+    }
+
+    inline Tensor backward_max_pooling_2x2(const Tensor & upstream_grad, const Tensor &input) {
+        if (upstream_grad.getShape().size() != 4 || input.getShape().size() != 4) {
+            throw std::runtime_error("Invalid shape for backward_max_pooling_2x2");
+        }
+
+        const int N = input.getShape()[0];
+        const int C = input.getShape()[1];
+        const int H = input.getShape()[2];
+        const int W = input.getShape()[3];
+
+        if (upstream_grad.getShape()[0] != N || upstream_grad.getShape()[1] != C || upstream_grad.getShape()[2] != H / 2 || upstream_grad.getShape()[3] != W / 2) {
+            throw std::runtime_error("Invalid shape for backward_max_pooling_2x2");
+        }
+
+        auto [device, dy, x] = Tensor::unifyDevice(upstream_grad, input);
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for backward_max_pooling_2x2");
+        }
+
+        Tensor dx({N, C, H, W}, TensorDevice::GPU);
+
+        for (int i = 0; i < N; i++) {
+            tensor_kernel::backward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(
+                dy.getRawData() + i * C * H / 2 * W / 2,
+                x.getRawData() + i * C * H * W,
+                dx.getRawData() + i * C * H * W,
+                C, H, W
+            );
+        }
+
+        return dx;
+    }
+
     inline Tensor forward_softmax(const Tensor &input) {
         if (input.getShape().size() != 2) {
             throw std::runtime_error("Invalid shape for forward_softmax");

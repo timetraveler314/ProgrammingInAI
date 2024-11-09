@@ -60,6 +60,8 @@ PYBIND11_MODULE(Genshin, m) {
     py::module nn = m.def_submodule("nn");
     nn.def("forward_fc", &TensorNN::forward_fc);
     nn.def("backward_fc", &TensorNN::backward_fc);
+    nn.def("forward_max_pooling_2x2", &TensorNN::forward_max_pooling_2x2);
+    nn.def("backward_max_pooling_2x2", &TensorNN::backward_max_pooling_2x2);
     nn.def("forward_softmax", &TensorNN::forward_softmax);
     nn.def("cross_entropy", &TensorNN::cross_entropy);
     nn.def("backward_softmax_cross_entropy", &TensorNN::backward_softmax_cross_entropy);

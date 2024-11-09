@@ -16,11 +16,6 @@ int main() {
     auto w = Tensor::iota({4, 3}, TensorDevice::GPU);
     auto b = Tensor::iota({4}, TensorDevice::GPU);
 
-    // auto y = Tensor({2,3}, TensorDevice::GPU);
-    // cuda::std::span<float> x_span(x.getRawData(), x.size());
-    // cuda::std::span<float> y_span(y.getRawData(), y.size());
-    // tensor_kernel::forward_softmax_kernel_gpu(x_span,y_span,2,3);
-
     std::cout << "X: " << x << std::endl;
     std::cout << "W: " << w << std::endl;
     std::cout << "B: " << b << std::endl;

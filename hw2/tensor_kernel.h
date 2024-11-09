@@ -181,8 +181,7 @@ namespace tensor_kernel {
     }
 
     __global__ void cross_entropy_kernel_gpu(TensorDataType *input, TensorDataType *target, TensorDataType * output_loss, size_t batch_size, size_t num_classes) {
-        int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i < batch_size) {
+        CUDA_KERNEL_LOOP(i, batch_size) {
             int label = static_cast<int>(target[i]);
             TensorDataType my_loss = 0.0;
             if (label >= 0 && label < num_classes) {
@@ -194,13 +193,55 @@ namespace tensor_kernel {
     }
 
     __global__ void backward_softmax_cross_entropy_kernel_gpu(TensorDataType *softmax_input, TensorDataType *target, TensorDataType *output_grad, size_t batch_size, size_t num_classes) {
-        int i = blockIdx.x * blockDim.x + threadIdx.x;
-        if (i >= batch_size * num_classes) return;
+        CUDA_KERNEL_LOOP(i, batch_size * num_classes) {
+            int sample_idx = i / num_classes;
+            int class_idx = i % num_classes;
 
-        int sample_idx = i / num_classes;
-        int class_idx = i % num_classes;
+            output_grad[i] = softmax_input[i] - (target[sample_idx] == class_idx);
+        }
+    }
 
-        output_grad[i] = softmax_input[i] - (target[sample_idx] == class_idx);
+    __global__ void forward_max_pooling_2x2_kernel_gpu(const TensorDataType *input, TensorDataType *output, size_t num_channels, size_t height, size_t width) {
+        CUDA_KERNEL_LOOP(index, num_channels * height / 2 * width / 2) {
+            int w = index % (width / 2);
+            int h = (index / (width / 2)) % (height / 2);
+            int c = (index / (width / 2) / (height / 2)) % num_channels;
+            // int n = index / (width / 2) / (height / 2) / num_channels;
+
+            const int input_idx = c * height * width + h * 2 * width + w * 2;
+            TensorDataType max_val = input[input_idx];
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    max_val = fmaxf(max_val, input[input_idx + i * width + j]);
+                }
+            }
+
+            output[index] = max_val;
+        }
+    }
+
+    __global__ void backward_max_pooling_2x2_kernel_gpu(const TensorDataType *upstream_grad, const TensorDataType *input, TensorDataType *output_grad, size_t num_channels, size_t height, size_t width) {
+        CUDA_KERNEL_LOOP(index, num_channels * height / 2 * width / 2) {
+            int w = index % (width / 2);
+            int h = (index / (width / 2)) % (height / 2);
+            int c = (index / (width / 2) / (height / 2)) % num_channels;
+
+            const int output_idx = c * height / 2 * width / 2 + h * width / 2 + w;
+            const int input_idx = c * height * width + h * 2 * width + w * 2;
+
+            TensorDataType max_val = input[input_idx];
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    max_val = fmaxf(max_val, input[input_idx + i * width + j]);
+                }
+            }
+
+            for (int i = 0; i < 2; i++) {
+                for (int j = 0; j < 2; j++) {
+                    output_grad[input_idx + i * width + j] = (input[input_idx + i * width + j] == max_val) * upstream_grad[output_idx];
+                }
+            }
+        }
     }
 };
 
