@@ -35,7 +35,7 @@ namespace TensorNN {
     }
 
     inline std::tuple<Tensor, Tensor, Tensor> backward_fc(const Tensor &dy, const Tensor &input, const Tensor &weight) {
-        // Shape check
+        // Shape check.
         if (dy.getShape().size() != 2 || input.getShape().size() != 2 || weight.getShape().size() != 2) {
             throw std::runtime_error("Invalid shape for backward_fc");
         }
@@ -57,6 +57,26 @@ namespace TensorNN {
         Tensor dx({N, Cin}, TensorDevice::GPU), dw({Cout, Cin}, TensorDevice::GPU), db({Cout}, TensorDevice::GPU);
         tensor_kernel::backward_fc_kernel_gpu(x.getRawData(), w.getRawData(), dy.getRawData(), dx.getRawData(), dw.getRawData(), db.getRawData(), N, Cin, Cout);
         return {dx, dw, db};
+    }
+
+    inline Tensor forward_softmax(const Tensor &input) {
+        if (input.getShape().size() != 2) {
+            throw std::runtime_error("Invalid shape for forward_softmax");
+        }
+
+        const int N = input.getShape()[0];
+        const int C = input.getShape()[1];
+
+        auto [device, x] = Tensor::unifyDevice(input);
+
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for forward_softmax");
+        }
+
+        Tensor y({N, C}, TensorDevice::GPU);
+        tensor_kernel::forward_softmax_kernel_gpu(x.getRawData(), y.getRawData(), N, C);
+
+        return y;
     }
 }
 

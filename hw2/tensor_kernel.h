@@ -165,11 +165,19 @@ namespace tensor_kernel {
         cudaFree(ones);
     }
 
-    inline void forward_softmax_kernel_gpu(cuda::std::span<const TensorDataType> input, cuda::std::span<TensorDataType> output, size_t batch_size, size_t num_classes) {
-        // thrust::transform(thrust::device, input.begin(), input.end(), output.begin(),
-        //     [=] __device__ (TensorDataType x) {
-        //         return exp(x);
-        //     });
+    inline void forward_softmax_kernel_gpu(TensorDataType *input, TensorDataType *output, size_t batch_size, size_t num_classes) {
+        for (int i = 0; i < batch_size; i++) {
+            auto current_row = input + i * num_classes;
+            auto current_output = output + i * num_classes;
+            auto max_val = thrust::reduce(thrust::device, current_row, current_row + num_classes,
+                std::numeric_limits<TensorDataType>::min(), thrust::maximum<TensorDataType>());
+            thrust::transform(thrust::device, current_row, current_row + num_classes, current_output,
+                [max_val] __device__ (TensorDataType val) { return exp(val - max_val); });
+
+            auto normalizer = thrust::reduce(thrust::device, current_output, current_output + num_classes, 0.0f, thrust::plus<TensorDataType>());
+            thrust::transform(thrust::device, current_output, current_output + num_classes, current_output,
+                [normalizer] __device__ (TensorDataType val) { return val / normalizer; });
+        }
     }
 };
 
