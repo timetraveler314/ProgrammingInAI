@@ -103,6 +103,8 @@ namespace TensorNN {
 
         Tensor dx({N, C, H, W}, TensorDevice::GPU);
 
+        cudaMemset(dx.getRawData(), 0, dx.size() * sizeof(TensorDataType));
+
         for (int i = 0; i < N; i++) {
             tensor_kernel::backward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(
                 dy.getRawData() + i * C * H / 2 * W / 2,
@@ -163,15 +165,15 @@ namespace TensorNN {
     }
 
     // The `input` argument here is the output of the softmax layer.
-    inline Tensor backward_softmax_cross_entropy(const Tensor &input, const Tensor &ground_truth) {
-        if (input.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
+    inline Tensor backward_softmax_cross_entropy(const Tensor &softmax_output, const Tensor &ground_truth) {
+        if (softmax_output.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
             throw std::runtime_error("Invalid shape for backward_softmax_cross_entropy");
         }
 
-        const int N = input.getShape()[0];
-        const int C = input.getShape()[1];
+        const int N = softmax_output.getShape()[0];
+        const int C = softmax_output.getShape()[1];
 
-        auto [device, x, gt] = Tensor::unifyDevice(input, ground_truth);
+        auto [device, x, gt] = Tensor::unifyDevice(softmax_output, ground_truth);
 
         if (device != TensorDevice::GPU) {
             throw std::runtime_error("Unimplemented device for backward_softmax_cross_entropy");
@@ -217,7 +219,7 @@ namespace TensorNN {
         cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * 3 * 4), kCudaThreadsNum>>>(
+            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 im.getRawData() + i * C * H * W, // Current image
                 col,
                 C, H, W, // image C, H, W
@@ -237,8 +239,109 @@ namespace TensorNN {
             );
         }
 
+        cudaFree(col);
+        cublasDestroy(handle);
+
         return y;
     }
+
+    inline std::tuple<Tensor, Tensor> conv2d_3x3_backward(const Tensor& images, const Tensor& kernels, const Tensor& output_grad) {
+        if (images.getShape().size() != 4 || kernels.getShape().size() != 4 || output_grad.getShape().size() != 4) {
+            throw std::runtime_error("Invalid shape for conv2d_3x3 backward");
+        }
+
+        const int N = images.getShape()[0];
+        const int C = images.getShape()[1];
+        const int H = images.getShape()[2];
+        const int W = images.getShape()[3];
+
+        const int K = kernels.getShape()[0];
+        const int K_C = kernels.getShape()[1];
+        const int K_H = kernels.getShape()[2];
+        const int K_W = kernels.getShape()[3];
+
+        if (K_C != C || K_H != 3 || K_W != 3) {
+            throw std::runtime_error("Invalid shape for conv2d_3x3 backward");
+        }
+
+        if (output_grad.getShape()[0] != N || output_grad.getShape()[1] != K || output_grad.getShape()[2] != H || output_grad.getShape()[3] != W) {
+            throw std::runtime_error("Output gradient shape does not match expected dimensions");
+        }
+
+        auto [device, im, k] = Tensor::unifyDevice(images, kernels);
+
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for conv2d_3x3 backward");
+        }
+
+        cublasHandle_t handle;
+        cublasCreate(&handle);
+
+        Tensor kernel_grad({K, C, 3, 3}, TensorDevice::GPU);
+        TensorDataType *col;
+        cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
+
+        cudaMemset(kernel_grad.getRawData(), 0, kernel_grad.size() * sizeof(TensorDataType));
+
+        for (int i = 0; i < N; i++) {
+            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
+                im.getRawData() + i * C * H * W, // Current image
+                col,
+                C, H, W, // image C, H, W
+                3, 3, // kernel size
+                1, 1, // padding
+                1, 1, // stride
+                H, W // col H, W
+            );
+
+            cudaDeviceSynchronize();
+
+            tensor_kernel::gemm_row_major_gpu(
+                handle, CUBLAS_OP_N, CUBLAS_OP_T,
+                K, C * 9, H * W,
+                1.0f, 1.0f,
+                output_grad.getRawData() + i * K * H * W, col, kernel_grad.getRawData()
+            );
+        }
+
+        // No need to average the kernel gradients
+
+        // Compute the input gradient
+
+        Tensor input_grad({N, C, H, W}, TensorDevice::GPU);
+
+        TensorDataType *grad_col;
+        cudaMalloc(&grad_col, C * 9 * H * W * sizeof(TensorDataType));
+
+        for (int i = 0; i < N; i++) {
+            tensor_kernel::gemm_row_major_gpu(
+                handle, CUBLAS_OP_T, CUBLAS_OP_N,
+                C * 9, H * W, K,
+                1.0f, 0.0f,
+                k.getRawData(), output_grad.getRawData() + i * K * H * W, grad_col
+            );
+            cudaDeviceSynchronize();
+            CHECK_CUDA_ERROR(("gemm_row_major_gpu" + std::to_string(i)).c_str());
+
+            tensor_kernel::col2im_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
+                grad_col,
+                input_grad.getRawData() + i * C * H * W,
+                C, H, W,
+                3, 3,
+                1, 1,
+                1, 1,
+                H, W
+            );
+            cudaDeviceSynchronize();
+            CHECK_CUDA_ERROR("col2im_kernel");
+        }
+
+        cudaFree(col);
+        cublasDestroy(handle);
+
+        return {input_grad, kernel_grad};
+}
+
 }
 
 #endif //TENSORNN_CUH

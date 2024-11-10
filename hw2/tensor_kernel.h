@@ -14,6 +14,17 @@
 #include <thrust/transform.h>
 #include <thrust/execution_policy.h>
 
+inline void checkCudaError(const char* msg) {
+    cudaDeviceSynchronize();
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA error after " << msg << ": " << cudaGetErrorString(err) << std::endl;
+        // throw std::runtime_error("CUDA error");
+    }
+}
+
+#define CHECK_CUDA_ERROR(msg) checkCudaError(msg)
+
 // Use 512 or 256 threads per block
 constexpr int kCudaThreadsNum = 512;
 inline int CudaGetBlocks(const int N) {
@@ -32,9 +43,13 @@ namespace tensor_kernel {
         TensorDataType alpha_local = 1.0;
         TensorDataType beta_local = 0.0;
 
+        CHECK_CUDA_ERROR("something happened before gemm_row_major_gpu");
+
         TensorDataType* tmp = nullptr;
         cudaMalloc(&tmp, m * n * sizeof(TensorDataType));
         cudaMemcpy(tmp, C, m * n * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+
+        CHECK_CUDA_ERROR("gemm_row_major_gpu: tmp allocation");
 
         // Transpose C to allow for beta != 0
         cublasSgeam(handle, CUBLAS_OP_T, CUBLAS_OP_T,
@@ -44,6 +59,8 @@ namespace tensor_kernel {
             &beta_local,
             C, n,
             tmp, m);
+
+        CHECK_CUDA_ERROR("gemm_row_major_gpu: first transpose");
 
         alpha_local = alpha;
         beta_local = beta;
@@ -55,6 +72,8 @@ namespace tensor_kernel {
                     &beta_local,
                     tmp, m);
 
+        CHECK_CUDA_ERROR("gemm_row_major_gpu: cublasSgemm");
+
         // Transpose the result
         alpha_local = 1.0;
         beta_local = 0.0;
@@ -65,6 +84,8 @@ namespace tensor_kernel {
                     &beta_local,
                     tmp, m,
                     C, n);
+
+        CHECK_CUDA_ERROR("gemm_row_major_gpu: second transpose");
 
         // The original code: (which doesn't work)
         // cublasSgemm(handle, (transa == CUBLAS_OP_N) ? CUBLAS_OP_T : CUBLAS_OP_N, (transb == CUBLAS_OP_N) ? CUBLAS_OP_T : CUBLAS_OP_N,
@@ -192,12 +213,12 @@ namespace tensor_kernel {
             atomicAdd(output_loss, my_loss / batch_size);
         }
     }
-    __global__ void backward_softmax_cross_entropy_kernel_gpu(TensorDataType *softmax_input, TensorDataType *target, TensorDataType *output_grad, size_t batch_size, size_t num_classes) {
+    __global__ void backward_softmax_cross_entropy_kernel_gpu(TensorDataType *softmax_output, TensorDataType *target, TensorDataType *output_grad, size_t batch_size, size_t num_classes) {
         CUDA_KERNEL_LOOP(i, batch_size * num_classes) {
             int sample_idx = i / num_classes;
             int class_idx = i % num_classes;
 
-            output_grad[i] = softmax_input[i] - (target[sample_idx] == class_idx);
+            output_grad[i] = softmax_output[i] - (target[sample_idx] == class_idx);
         }
     }
 
@@ -287,7 +308,7 @@ namespace tensor_kernel {
             int c = im_index / (W * H);
 
             float val = 0.0f;
-            int count = 0; // Number of column elements contributing to this output element
+            // int count = 0; // Number of column elements contributing to this output element
             for (int kh = 0; kh < kernel_h; ++kh) {
                 for (int kw = 0; kw < kernel_w; ++kw) {
                     int h_out = (h + pad_h - kh) / stride_h;
@@ -295,11 +316,21 @@ namespace tensor_kernel {
                     if (h_out >= 0 && h_out < out_h && w_out >= 0 && w_out < out_w) {
                         int col_index = ((c * kernel_h * kernel_w + kh * kernel_w + kw) * out_h + h_out) * out_w + w_out;
                         val += col[col_index];
-                        count++;
+                        // count++;
                     }
                 }
             }
-            im[im_index] = val / count;
+            im[im_index] = val;
+        }
+    }
+
+    __global__ void average_dim_1_kernel(const float* input, float* output, int N, int D) {
+        CUDA_KERNEL_LOOP(j, D) {
+            float sum = 0.0f;
+            for (int i = 0; i < N; i++) {
+                sum += input[i * D + j];
+            }
+            output[j] = sum / N;
         }
     }
 };

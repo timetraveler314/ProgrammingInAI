@@ -61,6 +61,7 @@ PYBIND11_MODULE(Genshin, m) {
     nn.def("forward_fc", &TensorNN::forward_fc);
     nn.def("backward_fc", &TensorNN::backward_fc);
     nn.def("conv2d_3x3", &TensorNN::conv2d_3x3);
+    nn.def("conv2d_3x3_backward", &TensorNN::conv2d_3x3_backward);
     nn.def("forward_max_pooling_2x2", &TensorNN::forward_max_pooling_2x2);
     nn.def("backward_max_pooling_2x2", &TensorNN::backward_max_pooling_2x2);
     nn.def("forward_softmax", &TensorNN::forward_softmax);

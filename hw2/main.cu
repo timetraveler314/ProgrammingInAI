@@ -38,7 +38,7 @@ int main() {
 
     // 3 times 3 conv kernel
 
-    const int C = 1;
+    int C = 1;
     auto im = Tensor::iota({C, 3, 4}, TensorDevice::GPU);
     auto col = Tensor({C, 9, 12}, TensorDevice::GPU);
 
@@ -69,6 +69,21 @@ int main() {
     );
 
     std::cout << im2 << std::endl;
+
+    std::cout << "conv backward test" << std::endl;
+
+    // (3, 3, 160, 160, 40)  # Larger case
+    C = 3;
+    const int N = 3, H = 160, W = 160, K = 40;
+
+    auto ims = Tensor::iota({N,C,H,W}, TensorDevice::GPU);
+    auto upstream_grad = Tensor::iota({N,K,H,W}, TensorDevice::GPU);
+    auto kernel = Tensor::iota({K,C,3,3}, TensorDevice::GPU);
+
+    auto [dims, dkernel] = TensorNN::conv2d_3x3_backward(ims, kernel, upstream_grad);
+
+    // std::cout << "dims: " << dims << std::endl;
+    // std::cout << "dkernel: " << dkernel << std::endl;
 
     return 0;
 }
