@@ -182,6 +182,63 @@ namespace TensorNN {
 
         return dx;
     }
+
+    inline Tensor conv2d_3x3(const Tensor &images, const Tensor &kernels) {
+        if (images.getShape().size() != 4 || kernels.getShape().size() != 4) {
+            throw std::runtime_error("Invalid shape for conv2d_3x3");
+        }
+
+        const int N = images.getShape()[0];
+        const int C = images.getShape()[1];
+        const int H = images.getShape()[2];
+        const int W = images.getShape()[3];
+
+        const int K = kernels.getShape()[0];
+        const int K_C = kernels.getShape()[1];
+        const int K_H = kernels.getShape()[2];
+        const int K_W = kernels.getShape()[3];
+
+        if (K_C != C || K_H != 3 || K_W != 3) {
+            throw std::runtime_error("Invalid shape for conv2d_3x3");
+        }
+
+        auto [device, im, k] = Tensor::unifyDevice(images, kernels);
+
+        if (device != TensorDevice::GPU) {
+            throw std::runtime_error("Unimplemented device for conv2d_3x3");
+        }
+
+        cublasHandle_t handle;
+        cublasCreate(&handle);
+
+        Tensor y({N, K, H, W}, TensorDevice::GPU);
+
+        TensorDataType *col;
+        cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
+
+        for (int i = 0; i < N; i++) {
+            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * 3 * 4), kCudaThreadsNum>>>(
+                im.getRawData() + i * C * H * W, // Current image
+                col,
+                C, H, W, // image C, H, W
+                3, 3, // kernel size
+                1, 1, // padding
+                1, 1, // stride
+                H, W // col H, W
+            );
+
+            cudaDeviceSynchronize();
+
+            tensor_kernel::gemm_row_major_gpu(
+                handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                K, H * W, C * 9,
+                1.0f, 0.0f,
+                k.getRawData(), col, y.getRawData() + i * K * H * W
+            );
+        }
+
+        return y;
+    }
 }
 
 #endif //TENSORNN_CUH

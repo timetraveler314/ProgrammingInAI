@@ -36,6 +36,8 @@ public:
     static Tensor iota(std::vector<int> shape, TensorDevice device);
     static Tensor uniform(std::vector<int> shape, TensorDevice device, TensorDataType low = 0.0f, TensorDataType high = 1.0f);
 
+    Tensor view(const std::vector<int> &newShape) const;
+
     // Nothing needed here. Data pointer will be freed automatically by
     // the shared_ptr managing DeviceSpace.
     ~Tensor() = default;

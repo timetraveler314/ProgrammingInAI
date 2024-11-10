@@ -34,6 +34,42 @@ int main() {
 
     std::cout << rand_tensor << std::endl;
 
+    std::cout << "im2col test" << std::endl;
+
+    // 3 times 3 conv kernel
+
+    const int C = 1;
+    auto im = Tensor::iota({C, 3, 4}, TensorDevice::GPU);
+    auto col = Tensor({C, 9, 12}, TensorDevice::GPU);
+
+    tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * 3 * 4), kCudaThreadsNum>>>(
+        im.getRawData(),
+        col.getRawData(),
+        C, 3, 4, // image C, H, W
+        3, 3, // kernel size
+        1, 1, // padding
+        1, 1, // stride
+        3, 4 // col H, W
+    );
+
+    std::cout << im << std::endl;
+
+    std::cout << col << std::endl;
+
+    auto im2 = Tensor({C, 3, 4}, TensorDevice::GPU);
+
+    tensor_kernel::col2im_kernel<<<CudaGetBlocks(C * 3 * 4), kCudaThreadsNum>>>(
+        col.getRawData(),
+        im2.getRawData(),
+        C, 3, 4, // image C, H, W
+        3, 3, // kernel size
+        1, 1, // padding
+        1, 1, // stride
+        3, 4 // col H, W
+    );
+
+    std::cout << im2 << std::endl;
+
     return 0;
 }
 

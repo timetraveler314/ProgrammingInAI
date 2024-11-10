@@ -55,6 +55,12 @@ Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device, TensorDataTy
     }
 }
 
+Tensor Tensor::view(const std::vector<int> &newShape) const {
+    Tensor newTensor(newShape, device);
+    newTensor.data = data;
+    return newTensor;
+}
+
 Tensor Tensor::gpu() const {
     Tensor gpuTensor(shape, TensorDevice::GPU);
     gpuTensor.data = data.copy_to(TensorDevice::GPU);

@@ -141,6 +141,7 @@ namespace tensor_kernel {
         // Compute the input gradient
         gemm_row_major_gpu(handle, CUBLAS_OP_N, CUBLAS_OP_N,
             batch_size, input_size, output_size,
+
             1.0, 0.0,
             output_grad, weight, input_grad);
 
@@ -191,7 +192,6 @@ namespace tensor_kernel {
             atomicAdd(output_loss, my_loss / batch_size);
         }
     }
-
     __global__ void backward_softmax_cross_entropy_kernel_gpu(TensorDataType *softmax_input, TensorDataType *target, TensorDataType *output_grad, size_t batch_size, size_t num_classes) {
         CUDA_KERNEL_LOOP(i, batch_size * num_classes) {
             int sample_idx = i / num_classes;
@@ -241,6 +241,65 @@ namespace tensor_kernel {
                     output_grad[input_idx + i * width + j] = (input[input_idx + i * width + j] == max_val) * upstream_grad[output_idx];
                 }
             }
+        }
+    }
+
+    __global__ void im2col_kernel(const float* input, float* output,
+                                  int C, int H, int W,
+                                  int kernel_h, int kernel_w,
+                                  int pad_h, int pad_w,
+                                  int stride_h, int stride_w,
+                                  int out_h, int out_w) {
+        CUDA_KERNEL_LOOP(col_index, C * out_h * out_w) {
+            int w_out = col_index % out_w;
+            int h_out = (col_index / out_w) % out_h;
+            int c_in = (col_index / (out_w * out_h)) % C;
+
+            int h_in_start = h_out * stride_h - pad_h;
+            int w_in_start = w_out * stride_w - pad_w;
+
+            for (int kh = 0; kh < kernel_h; ++kh) {
+                for (int kw = 0; kw < kernel_w; ++kw) {
+                    int h_in = h_in_start + kh;
+                    int w_in = w_in_start + kw;
+                    int output_index = ((c_in * kernel_h * kernel_w + kh * kernel_w + kw) * out_h + h_out) * out_w + w_out;
+
+                    if (h_in >= 0 && h_in < H && w_in >= 0 && w_in < W) {
+                        int input_index = (c_in * H + h_in) * W + w_in;
+                        output[output_index] = input[input_index];
+                    } else {
+                        output[output_index] = 0.0f;  // Zero-padding
+                    }
+                }
+            }
+        }
+    }
+
+    __global__ void col2im_kernel(const float* col, float* im,
+                                  int C, int H, int W,
+                                  int kernel_h, int kernel_w,
+                                  int pad_h, int pad_w,
+                                  int stride_h, int stride_w,
+                                  int out_h, int out_w) {
+        CUDA_KERNEL_LOOP(im_index, C * H * W) {
+            int w = im_index % W;
+            int h = (im_index / W) % H;
+            int c = im_index / (W * H);
+
+            float val = 0.0f;
+            int count = 0; // Number of column elements contributing to this output element
+            for (int kh = 0; kh < kernel_h; ++kh) {
+                for (int kw = 0; kw < kernel_w; ++kw) {
+                    int h_out = (h + pad_h - kh) / stride_h;
+                    int w_out = (w + pad_w - kw) / stride_w;
+                    if (h_out >= 0 && h_out < out_h && w_out >= 0 && w_out < out_w) {
+                        int col_index = ((c * kernel_h * kernel_w + kh * kernel_w + kw) * out_h + h_out) * out_w + w_out;
+                        val += col[col_index];
+                        count++;
+                    }
+                }
+            }
+            im[im_index] = val / count;
         }
     }
 };
