@@ -17,7 +17,7 @@ py::array_t<float> numpy(const Tensor &t) {
 
 Tensor from_numpy(py::array_t<float, py::array::c_style | py::array::forcecast> np) {
     std::vector<int> shape(np.shape(), np.shape() + np.ndim());
-    // By default, we put the tensor on the CPU
+    // By default, we put the tensor on the GPU
     Tensor t(shape, TensorDevice::GPU);
     cudaMemcpy(t.getRawData(), np.data(), t.size() * sizeof(float),
                t.getDevice() == TensorDevice::CPU ? cudaMemcpyHostToHost
@@ -51,10 +51,6 @@ PYBIND11_MODULE(Genshin, m) {
             return "<Tensor shape=" + shape + " on " + device + ">";
         })
         .def("__str__", &Tensor::toString);
-        // .def("__add__", &operator+)
-        // .def("__sub__", &operator-)
-        // .def("__mul__", &operator*)
-        // .def("__truediv__", &operator/);
 
     // TensorNN namespace
     py::module nn = m.def_submodule("nn");

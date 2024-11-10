@@ -20,7 +20,6 @@ def test_max_pooling(N, C, H, W):
     pool = torch.nn.MaxPool2d(kernel_size=2, stride=2)
     expected_output_torch = pool(images_torch).detach().numpy()
 
-    # Genshin custom max pooling implementation
     images_gen = Tensor.from_numpy(images_np)
     output_gen = nn.forward_max_pooling_2x2(images_gen).numpy()
 

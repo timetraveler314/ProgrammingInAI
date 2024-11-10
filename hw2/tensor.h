@@ -59,11 +59,11 @@ public:
 
     int size() const;
 
-    friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
-    friend Tensor operator-(const Tensor& lhs, const Tensor& rhs);
-    friend Tensor operator*(const Tensor& lhs, const Tensor& rhs);
-    friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
-    friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
+    // friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
+    // friend Tensor operator-(const Tensor& lhs, const Tensor& rhs);
+    // friend Tensor operator*(const Tensor& lhs, const Tensor& rhs);
+    // friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
+    // friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const Tensor& tensor);

@@ -9,9 +9,9 @@
 #include "global_curand_generator.cuh"
 #include "tensornn.cuh"
 
-Tensor get_test_neg1_1_tensor();
-
 int main() {
+    std::cout << "=== Test 1 : Fully connected layer ===" << std::endl;
+
     auto x = Tensor::iota({2, 3}, TensorDevice::GPU);
     auto w = Tensor::iota({4, 3}, TensorDevice::GPU);
     auto b = Tensor::iota({4}, TensorDevice::GPU);
@@ -24,19 +24,17 @@ int main() {
 
     std::cout << "Result: " << result << std::endl;
 
-    auto [dx, dw, db] = TensorNN::backward_fc(get_test_neg1_1_tensor(), x, w);
+    auto [dx, dw, db] = TensorNN::backward_fc(Tensor::uniform({2,4}, TensorDevice::GPU), x, w);
+
+    std::cout << "Backward gradients:" << std::endl;
 
     std::cout << "dx: " << dx << std::endl;
     std::cout << "dw: " << dw << std::endl;
     std::cout << "db: " << db << std::endl;
 
-    auto rand_tensor = Tensor::uniform({2,3,4}, TensorDevice::GPU);
+    std::cout << "=== Test 2 : Convolutional layer ===" << std::endl;
 
-    std::cout << rand_tensor << std::endl;
-
-    std::cout << "im2col test" << std::endl;
-
-    // 3 times 3 conv kernel
+    std::cout << "== im2col test ==" << std::endl;
 
     int C = 1;
     auto im = Tensor::iota({C, 3, 4}, TensorDevice::GPU);
@@ -52,11 +50,13 @@ int main() {
         3, 4 // col H, W
     );
 
-    std::cout << im << std::endl;
+    std::cout << "image: " << im << std::endl;
 
-    std::cout << col << std::endl;
+    std::cout << "col:" << col << std::endl;
 
     auto im2 = Tensor({C, 3, 4}, TensorDevice::GPU);
+
+    std::cout << "== col2im test, using col from im2col test ==" << std::endl;
 
     tensor_kernel::col2im_kernel<<<CudaGetBlocks(C * 3 * 4), kCudaThreadsNum>>>(
         col.getRawData(),
@@ -70,37 +70,57 @@ int main() {
 
     std::cout << im2 << std::endl;
 
-    std::cout << "conv backward test" << std::endl;
+    std::cout << "== conv backward test ==" << std::endl;
 
-    // (3, 3, 160, 160, 40)  # Larger case
-    C = 3;
-    const int N = 3, H = 160, W = 160, K = 40;
+    C = 2;
+    int N = 1, H = 4, W = 3, K = 4;
 
     auto ims = Tensor::iota({N,C,H,W}, TensorDevice::GPU);
     auto upstream_grad = Tensor::iota({N,K,H,W}, TensorDevice::GPU);
-    auto kernel = Tensor::iota({K,C,3,3}, TensorDevice::GPU);
+    // Random network parameters using cuRAND
+    auto kernel = Tensor::uniform({K,C,3,3}, TensorDevice::GPU);
 
     auto [dims, dkernel] = TensorNN::conv2d_3x3_backward(ims, kernel, upstream_grad);
 
-    // std::cout << "dims: " << dims << std::endl;
-    // std::cout << "dkernel: " << dkernel << std::endl;
+    std::cout << "dims: " << dims << std::endl;
+    std::cout << "dkernel: " << dkernel << std::endl;
+
+    std::cout << "=== Test 3 : Max Pooling 2x2 ===" << std::endl;
+
+    auto im_pool = Tensor::iota({1, 1, 4, 4}, TensorDevice::GPU);
+    auto pool_result = TensorNN::forward_max_pooling_2x2(im_pool);
+
+    std::cout << "im_pool: " << im_pool << std::endl;
+    std::cout << "pool_result: " << pool_result << std::endl;
+
+    auto upstream_grad_pool = Tensor::uniform({1, 1, 2, 2}, TensorDevice::GPU);
+    auto im_pool_grad = TensorNN::backward_max_pooling_2x2(upstream_grad_pool, im_pool);
+
+    std::cout << "== max pooling backward test ==" << std::endl;
+    std::cout << "upstream_grad_pool: " << upstream_grad_pool << std::endl;
+    std::cout << "im_pool_grad: " << im_pool_grad << std::endl;
+
+    std::cout << "=== Test 4 : Softmax (Forward) ===" << std::endl;
+
+    auto x_softmax = Tensor::iota({2, 3}, TensorDevice::GPU);
+    auto softmax_result = TensorNN::forward_softmax(x_softmax);
+
+    std::cout << "x_softmax: " << x_softmax << std::endl;
+    std::cout << "softmax_result: " << softmax_result << std::endl;
+
+    std::cout << "=== Test 5 : Softmax (Backward) & Cross Entropy Loss ===" << std::endl;
+
+    auto ground_truth = Tensor::iota({2}, TensorDevice::GPU);
+    auto loss = TensorNN::cross_entropy(softmax_result, ground_truth);
+
+    std::cout << "ground_truth: " << ground_truth << std::endl;
+    std::cout << "loss: " << loss << std::endl;
+
+    auto dx_softmax = TensorNN::backward_softmax_cross_entropy(softmax_result, ground_truth);
+
+    std::cout << "== Test Combined Softmax Backward and Cross Entropy Loss ==" << std::endl;
+    std::cout << "dx_softmax: " << dx_softmax << std::endl;
 
     return 0;
 }
 
-Tensor random_gpu_tensor(const std::vector<int>& shape) {
-    Tensor t(shape, TensorDevice::CPU);
-
-
-    return t.gpu();
-}
-
-Tensor get_test_neg1_1_tensor() {
-    Tensor t1({2,4}, TensorDevice::CPU);
-
-    for (int i = 0; i < t1.size(); i++) {
-        t1.getRawData()[i] = i % 2 == 0 ? -1 : 1;
-    }
-
-    return t1.gpu();
-}
