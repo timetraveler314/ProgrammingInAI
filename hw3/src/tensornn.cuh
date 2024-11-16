@@ -9,6 +9,101 @@
 #include "tensor_kernel.h"
 
 namespace TensorNN {
+    inline Tensor forward_relu(const Tensor &input) {
+        // No shape check needed
+
+        const int N = input.size();
+        Tensor result(input.getShape(), input.getDevice());
+
+        switch (input.getDevice()) {
+            case TensorDevice::CPU:
+                thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N,
+                    result.getRawData(),
+                    [] (const TensorDataType &x) { return (x > 0) ? x : 0; });
+                break;
+            case TensorDevice::GPU:
+                thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N,
+                    result.getRawData(),
+                    [] __device__ (const TensorDataType &x) { return (x > 0) ? x : 0; });
+            break;
+        }
+
+        return result;
+    }
+
+    inline Tensor backward_relu(const Tensor &input, const Tensor &grad) {
+        // Shape check
+        if (input.getShape() != grad.getShape()) {
+            throw std::runtime_error("Invalid shape for backward_relu");
+        }
+
+        const int N = input.size();
+        Tensor result(input.getShape(), input.getDevice());
+
+        switch (input.getDevice()) {
+            case TensorDevice::CPU:
+                thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N, grad.getRawData(),
+                    result.getRawData(),
+                    [] (const TensorDataType &x, const TensorDataType &g) { return (x > 0) ? g : 0; });
+                break;
+            case TensorDevice::GPU:
+                thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N, grad.getRawData(),
+                    result.getRawData(),
+                    [] __device__ (const TensorDataType &x, const TensorDataType &g) { return (x > 0) ? g : 0; });
+            break;
+        }
+
+        return result;
+    }
+
+    inline Tensor forward_sigmoid(const Tensor &input) {
+        // No shape check needed
+
+        const int N = input.size();
+        Tensor result(input.getShape(), input.getDevice());
+        auto func = [] __host__ __device__ (const TensorDataType &x) { return 1.0 / (1.0 + expf(-x)); };
+
+        switch (input.getDevice()) {
+            case TensorDevice::CPU:
+                thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N,
+                    result.getRawData(),
+                    func);
+            break;
+            case TensorDevice::GPU:
+                thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N,
+                    result.getRawData(),
+                    func);
+            break;
+        }
+
+        return result;
+    }
+
+    inline Tensor backward_sigmoid(const Tensor &input, const Tensor &grad) {
+        // Shape check
+        if (input.getShape() != grad.getShape()) {
+            throw std::runtime_error("Invalid shape for backward_sigmoid");
+        }
+
+        const int N = input.size();
+        Tensor result(input.getShape(), input.getDevice());
+
+        switch (input.getDevice()) {
+            case TensorDevice::CPU:
+                thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N, grad.getRawData(),
+                    result.getRawData(),
+                    [] (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
+                break;
+            case TensorDevice::GPU:
+                thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N, grad.getRawData(),
+                    result.getRawData(),
+                    [] __device__ (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
+            break;
+        }
+
+        return result;
+    }
+
     inline Tensor forward_fc(const Tensor &input, const Tensor &weight, const Tensor &bias) {
         // Shape check
         if (input.getShape().size() != 2 || weight.getShape().size() != 2 || bias.getShape().size() != 1) {

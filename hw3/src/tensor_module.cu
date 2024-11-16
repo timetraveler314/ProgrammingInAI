@@ -54,6 +54,10 @@ PYBIND11_MODULE(Genshin, m) {
 
     // TensorNN namespace
     py::module nn = m.def_submodule("nn");
+    nn.def("forward_relu", &TensorNN::forward_relu);
+    nn.def("backward_relu", &TensorNN::backward_relu);
+    nn.def("forward_sigmoid", &TensorNN::forward_sigmoid);
+    nn.def("backward_sigmoid", &TensorNN::backward_sigmoid);
     nn.def("forward_fc", &TensorNN::forward_fc);
     nn.def("backward_fc", &TensorNN::backward_fc);
     nn.def("conv2d_3x3", &TensorNN::conv2d_3x3);
