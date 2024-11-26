@@ -40,7 +40,8 @@ Tensor Tensor::iota(std::vector<int> shape, TensorDevice device) {
     return device == TensorDevice::CPU ? result : result.gpu();
 }
 
-Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device, TensorDataType low, TensorDataType high) {
+Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device) {
+    constexpr TensorDataType low = 0.0f, high = 1.0f;
     if (device == TensorDevice::CPU) {
         Tensor resultCPU(shape, TensorDevice::CPU);
         for (int i = 0; i < resultCPU.size(); i++) {

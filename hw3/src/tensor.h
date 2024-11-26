@@ -34,7 +34,7 @@ public:
 
     static Tensor ones(std::vector<int> shape, TensorDevice device);
     static Tensor iota(std::vector<int> shape, TensorDevice device);
-    static Tensor uniform(std::vector<int> shape, TensorDevice device, TensorDataType low = 0.0f, TensorDataType high = 1.0f);
+    static Tensor uniform(std::vector<int> shape, TensorDevice device);
 
     Tensor view(const std::vector<int> &newShape) const;
 

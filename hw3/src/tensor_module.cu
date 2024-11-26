@@ -37,6 +37,7 @@ PYBIND11_MODULE(Genshin, m) {
         .def(py::init<const std::vector<int>&, TensorDevice>(),
              py::arg("shape"), py::arg("device"))
         .def_static("iota", &Tensor::iota)
+        .def_static("uniform", &Tensor::uniform)
         .def("shape", &Tensor::getShape)
         .def("__repr__", [](const Tensor &t) {
             std::string device = t.getDevice() == TensorDevice::CPU ? "CPU" : "GPU";
