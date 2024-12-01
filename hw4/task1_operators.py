@@ -301,7 +301,7 @@ class EWiseDiv(TensorOp):
 
     def gradient(self, out_grad, node):
         lhs, rhs = node.inputs
-        return out_grad * (rhs ** (-1)), out_grad * (-lhs) * (rhs ** (-2))
+        return out_grad / rhs, -lhs * out_grad / (rhs * rhs)
         
 
 
@@ -361,7 +361,7 @@ class Reshape(TensorOp):
 
     def gradient(self, out_grad, node):
         x = node.inputs[0]
-        return [out_grad.reshape(x.shape)]
+        return [out_grad.reshape(x.realize_cached_data().shape)]
         
 
 
@@ -404,13 +404,11 @@ class Summation(TensorOp):
 
     def gradient(self, out_grad, node):
         x = node.inputs[0]
-        if self.axes is None:
-            return out_grad * Tensor(np.ones_like(x))
-        else:
-            sum_shape = list(x.shape)
-            for d in self.axes:
-                sum_shape[d] = 1
-            return out_grad.reshape(sum_shape).broadcast_to(x.shape)
+        axes = self.axes if self.axes is not None else tuple(range(len(x.shape)))
+        sum_shape = list(x.shape)
+        for d in axes:
+            sum_shape[d] = 1
+        return out_grad.reshape(sum_shape).broadcast_to(x.shape)
 
 
 def summation(a, axes=None):
