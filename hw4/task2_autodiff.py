@@ -54,9 +54,9 @@ def compute_gradient_of_variables(output_tensor, out_grad):
         grads_sum = grads[0]
         for i in range(1, len(grads)):
             grads_sum = grads_sum + grads[i]
-        node.grad = grads_sum
-        print("node.grad: " + str(type(node.grad)))
-        print(node.grad.shape)
+
+        if node.requires_grad:
+            node.grad = grads_sum
 
         if node.is_leaf():
             continue

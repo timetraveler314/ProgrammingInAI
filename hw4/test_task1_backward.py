@@ -131,5 +131,5 @@ if __name__ == "__main__":
     ## log 和 exp 的测试没写...
     ## 交作业的时候也是会测试的...
 
-    # Test ReLU myself
+    # Test ReLU for myself
     gradient_check(relu, Tensor(np.random.randn(5, 10)))
