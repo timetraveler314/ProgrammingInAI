@@ -118,7 +118,7 @@ def test_summation_backward():
 
 if __name__ == "__main__":
     ## 可以分别测试每个函数
-    test_power_scalar_backward()
+    # test_power_scalar_backward()
     # test_ewisepow_backward()
     # test_divide_backward()
     # test_divide_scalar_backward()
@@ -130,4 +130,6 @@ if __name__ == "__main__":
     # test_transpose_backward()
     ## log 和 exp 的测试没写...
     ## 交作业的时候也是会测试的...
-    
+
+    # Test ReLU myself
+    gradient_check(relu, Tensor(np.random.randn(5, 10)))

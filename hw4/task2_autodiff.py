@@ -15,15 +15,22 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
     根据输入边向后遍历。由于一个节点是在其所有前驱节点遍历后才被添加到排序中的，
     因此我们得到了一个拓扑排序。
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    visited = set()
+    topo_order = []
+    for node in node_list:
+        if node not in visited:
+            topo_sort_dfs(node, visited, topo_order)
+    return topo_order
     
 
 
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    visited.add(node)
+    for input_node in node.inputs:
+        if input_node not in visited:
+            topo_sort_dfs(input_node, visited, topo_order)
+    topo_order.append(node)
     
 
 def compute_gradient_of_variables(output_tensor, out_grad):
@@ -41,8 +48,25 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     # 根据我们要对其求梯度的 output_node，以逆拓扑排序遍历图。
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    for node in reverse_topo_order:
+        grads = node_to_output_grads_list[node]
+        assert len(grads) >= 1
+        grads_sum = grads[0]
+        for i in range(1, len(grads)):
+            grads_sum = grads_sum + grads[i]
+        node.grad = grads_sum
+        print("node.grad: " + str(type(node.grad)))
+        print(node.grad.shape)
+
+        if node.is_leaf():
+            continue
+
+        input_grads = node.op.gradient_as_tuple(node.grad, node)
+
+        for input_node, input_grad in zip(node.inputs, input_grads):
+            if input_node not in node_to_output_grads_list:
+                node_to_output_grads_list[input_node] = []
+            node_to_output_grads_list[input_node].append(input_grad)
     
 
 
