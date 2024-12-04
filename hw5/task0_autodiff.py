@@ -6,6 +6,7 @@
 from typing import List, Dict, Tuple
 from basic_operator import Op, Value
 
+
 def find_topo_sort(node_list: List[Value]) -> List[Value]:
     """
     给定一个节点列表，返回以这些节点结束的拓扑排序列表。
@@ -13,16 +14,22 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
     根据输入边向后遍历。由于一个节点是在其所有前驱节点遍历后才被添加到排序中的，
     因此我们得到了一个拓扑排序。
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
-    
+    visited = set()
+    topo_order = []
+    for node in node_list:
+        if node not in visited:
+            topo_sort_dfs(node, visited, topo_order)
+    return topo_order
 
 
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
-    ## 请于此填写你的代码
-    raise NotImplementedError()
-    
+    visited.add(node)
+    for input_node in node.inputs:
+        if input_node not in visited:
+            topo_sort_dfs(input_node, visited, topo_order)
+    topo_order.append(node)
+
 
 def compute_gradient_of_variables(output_tensor, out_grad):
     """
@@ -31,7 +38,7 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     """
     # map for 从节点到每个输出节点的梯度贡献列表
     node_to_output_grads_list = {}
-    # 我们实际上是在对标量 reduce_sum(output_node) 
+    # 我们实际上是在对标量 reduce_sum(output_node)
     # 而非向量 output_node 取导数。
     # 但这是损失函数的常见情况。
     node_to_output_grads_list[output_tensor] = [out_grad]
@@ -39,11 +46,22 @@ def compute_gradient_of_variables(output_tensor, out_grad):
     # 根据我们要对其求梯度的 output_node，以逆拓扑排序遍历图。
     reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
 
-    ## 请于此填写你的代码
-    raise NotImplementedError()
-    
+    for node in reverse_topo_order:
+        grads = node_to_output_grads_list[node]
+        assert len(grads) >= 1
+        grads_sum = grads[0]
+        for i in range(1, len(grads)):
+            grads_sum = grads_sum + grads[i]
 
+        if node.requires_grad:
+            node.grad = grads_sum
 
+        if node.is_leaf():
+            continue
 
+        input_grads = node.op.gradient_as_tuple(node.grad, node)
 
-
+        for input_node, input_grad in zip(node.inputs, input_grads):
+            if input_node not in node_to_output_grads_list:
+                node_to_output_grads_list[input_node] = []
+            node_to_output_grads_list[input_node].append(input_grad)
