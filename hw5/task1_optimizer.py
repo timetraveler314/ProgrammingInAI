@@ -10,6 +10,9 @@
 # from task0_autodiff import *
 # from task0_operators import *
 import numpy as np
+import torch
+from torchvision import datasets
+import torchvision.transforms.v2 as v2
 
 def parse_mnist():
     """
@@ -18,8 +21,28 @@ def parse_mnist():
     所以不会规定你的输入的格式
     但需要使得输出包括X_tr, y_tr和X_te, y_te
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    transform = v2.Compose([
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0], std=[1])
+    ])
+
+    mnist_train = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    mnist_test = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+
+    X_tr = np.array([img for img, label in mnist_train]).astype(np.float32)
+    # Flatten the images
+    X_tr = X_tr.reshape(X_tr.shape[0], -1)
+    y_tr = mnist_train.targets.numpy()
+
+    X_te = np.array([img for img, label in mnist_test]).astype(np.float32)
+    # Flatten the images
+    X_te = X_te.reshape(X_te.shape[0], -1)
+    y_te = mnist_test.targets.numpy()
+
+    print(X_tr.shape, y_tr.shape, X_te.shape, y_te.shape) # (60000, 784) (60000,) (10000, 784) (10000,)
+
+    return X_tr, y_tr, X_te, y_te
 
 def set_structure(n, hidden_dim, k):
     """
@@ -37,8 +60,10 @@ def set_structure(n, hidden_dim, k):
     return list(W1, W2)
     """
 
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    W1 = np.random.randn(n, hidden_dim).astype(np.float32) / np.sqrt(hidden_dim)
+    W2 = np.random.randn(hidden_dim, k).astype(np.float32) / np.sqrt(k)
+    return [W1, W2]
+
 
 def forward(X, weights):
     """
@@ -53,8 +78,9 @@ def forward(X, weights):
     W2 = weights[1]
     return np.maximum(X@W1,0)@W2
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    W1 = weights[0]
+    W2 = weights[1]
+    return np.maximum(X @ W1, 0) @ W2
 
 def softmax_loss(Z, y):
     """ 
@@ -69,8 +95,14 @@ def softmax_loss(Z, y):
     Returns:
         Average softmax loss over the sample.
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    # Normalize
+    Z -= np.max(Z, axis=1, keepdims=True)
+
+    Z_exp = np.exp(Z)
+    Z_sum = np.sum(Z_exp, axis=1, keepdims=True)
+    losses = np.log(Z_sum + 1e-8) - Z[np.arange(Z.shape[0]), y]
+    avg_loss = np.mean(losses)
+    return avg_loss
 
 def opti_epoch(X, y, weights, lr = 0.1, batch=100, beta1=0.9, beta2=0.999, using_adam=False):
     """
@@ -98,10 +130,42 @@ def SGD_epoch(X, y, weights, lr = 0.1, batch=100):
     Returns:
         None
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    iters = (X.shape[0] + batch - 1) // batch
+    W1, W2 = weights[0], weights[1]
+    for it in range(iters):
+        it_min, it_max = it * batch, min((it + 1) * batch, X.shape[0])
+        X_batch, y_batch = X[it_min:it_max, :], y[it_min:it_max]
 
-def Adam_epoch(X, y, weights, lr = 0.1, batch=100, beta1=0.9, beta2=0.999):
+        # Forward pass of linear and ReLU
+        Z1 = X_batch @ W1
+        A1 = np.maximum(Z1, 0)
+        Z2 = A1 @ W2
+
+        # Softmax
+        Z2 -= np.max(Z2, axis=1, keepdims=True)
+        Z2_exp = np.exp(Z2)
+        Z2_sum = np.sum(Z2_exp, axis=1, keepdims=True)
+        Z2_prob = Z2_exp / Z2_sum # Softmax output
+
+        # Backward pass of softmax loss
+        dZ2 = Z2_prob.copy()
+        dZ2[np.arange(dZ2.shape[0]), y_batch] -= 1
+        dZ2 /= batch
+
+        # Compute gradients
+        dW2 = A1.T @ dZ2
+        dA1 = dZ2 @ W2.T
+        dZ1 = dA1 * (Z1 > 0)
+        dW1 = X_batch.T @ dZ1
+
+        # SGD update
+        W1 -= lr * dW1
+        W2 -= lr * dW2
+
+    weights[0], weights[1] = W1, W2
+
+
+def Adam_epoch(X, y, weights, lr = 0.0001, batch=100, beta1=0.9, beta2=0.999):
     """ 
     ADAM优化一个
     本函数应该inplace地修改Weights矩阵来进行优化
@@ -128,8 +192,58 @@ def Adam_epoch(X, y, weights, lr = 0.1, batch=100, beta1=0.9, beta2=0.999):
     Returns:
         None
     """
-    ## 请于此填写你的代码
-    raise NotImplementedError()
+    iters = (X.shape[0] + batch - 1) // batch
+    W1, W2 = weights[0], weights[1]
+
+    # Initialize first and second moment estimates
+    mW1, mW2 = np.zeros_like(W1), np.zeros_like(W2)
+    vW1, vW2 = np.zeros_like(W1), np.zeros_like(W2)
+    t = 0
+    epsilon = 1e-8
+
+    for it in range(iters):
+        t += 1  # Increase time step
+
+        it_min, it_max = it * batch, min((it + 1) * batch, X.shape[0])
+        X_batch, y_batch = X[it_min:it_max, :], y[it_min:it_max]
+
+        # Forward pass of linear and ReLU
+        Z1 = X_batch @ W1
+        A1 = np.maximum(Z1, 0)
+        Z2 = A1 @ W2
+
+        # Softmax
+        Z2 -= np.max(Z2, axis=1, keepdims=True)
+        Z2_exp = np.exp(Z2)
+        Z2_sum = np.sum(Z2_exp, axis=1, keepdims=True)
+        Z2_prob = Z2_exp / Z2_sum # Softmax output
+
+        # Backward pass of softmax loss
+        dZ2 = Z2_prob.copy()
+        dZ2[np.arange(dZ2.shape[0]), y_batch] -= 1
+        dZ2 /= batch
+
+        # Compute gradients
+        dW2 = A1.T @ dZ2
+        dA1 = dZ2 @ W2.T
+        dZ1 = dA1 * (Z1 > 0)
+        dW1 = X_batch.T @ dZ1
+
+        # Adam update for W1
+        mW1 = beta1 * mW1 + (1 - beta1) * dW1
+        vW1 = beta2 * vW1 + (1 - beta2) * (dW1 ** 2)
+        mW1_hat = mW1 / (1 - beta1 ** t)
+        vW1_hat = vW1 / (1 - beta2 ** t)
+        W1 -= lr * mW1_hat / (np.sqrt(vW1_hat) + epsilon)
+
+        # Adam update for W2
+        mW2 = beta1 * mW2 + (1 - beta1) * dW2
+        vW2 = beta2 * vW2 + (1 - beta2) * (dW2 ** 2)
+        mW2_hat = mW2 / (1 - beta1 ** t)
+        vW2_hat = vW2 / (1 - beta2 ** t)
+        W2 -= lr * mW2_hat / (np.sqrt(vW2_hat) + epsilon)
+
+    weights[0], weights[1] = W1, W2
 
 
 def loss_err(h,y):
@@ -163,7 +277,7 @@ if __name__ == "__main__":
     X_tr, y_tr, X_te, y_te = parse_mnist() 
     weights = set_structure(X_tr.shape[1], 100, y_tr.max() + 1)
     ## using SGD optimizer 
-    train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr = 0.2, batch=100, beta1=0.9, beta2=0.999, using_adam=False)
+    # train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr = 0.2, batch=100, beta1=0.9, beta2=0.999, using_adam=False)
     ## using Adam optimizer
-    # train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr = 0.2, batch=100, beta1=0.9, beta2=0.999, using_adam=True)
+    train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr = 0.001, batch=100, beta1=0.9, beta2=0.999, using_adam=True)
     
