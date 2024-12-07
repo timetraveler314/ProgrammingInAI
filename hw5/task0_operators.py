@@ -7,6 +7,7 @@ import numpy as np
 from typing import List, Optional, Tuple, Union
 from device import cpu, Device
 from basic_operator import Op, Value
+from task0_autodiff import compute_gradient_of_variables
 
 
 class Tensor(Value):

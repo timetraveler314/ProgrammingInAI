@@ -38,6 +38,9 @@ class CPUDevice(Device):
         return np.random.rand(*shape)
 
     def one_hot(self, n, i, dtype="float32"):
+        # Check if n is a tuple, then n is a shape
+        if isinstance(n, tuple):
+            return np.eye(*n, dtype=dtype)[i]
         return np.eye(n, dtype=dtype)[i]
 
     def empty(self, shape, dtype="float32"):
