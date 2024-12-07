@@ -9,6 +9,8 @@
 """
 import random
 
+from matplotlib import pyplot as plt
+
 from task0_autodiff import *
 from task0_operators import *
 import numpy as np
@@ -180,10 +182,9 @@ def softmax_loss(Z, y):
     # avg_loss = np.mean(losses)
 
     y_one_hot = one_hot(Z.shape, i=y)
-    x = exp(Z).sum((1,))
-    y = log(x).sum()
-    z = (Z * y_one_hot).sum()
-    loss = (y - z) / Z.shape[0]
+    Z_expsum = exp(Z).sum((1,))
+    Z_sum = log(Z_expsum).sum()
+    loss = (Z_sum - (Z * y_one_hot).sum()) / Z.shape[0]
     return loss
 
 
@@ -351,13 +352,48 @@ def train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=500,
         print("|  {:>4} |    {:.5f} |   {:.5f} |   {:.5f} |  {:.5f} |" \
               .format(epoch, train_loss, train_err, test_loss, test_err))
 
+def train_over_multiple_lr(lr_values, X_tr, y_tr, X_te, y_te):
+    """
+    训练过程
+    """
+    global train_err, test_err
+    loss_map = {}
+    for lr in lr_values:
+        print(f'Training the network with LR = {lr}...')
+        weights = set_structure(X_tr.shape[1], 100, y_tr.max() + 1)
+        loss_list = []
+        for epoch in range(20):
+            opti_epoch(X_tr, y_tr, weights, lr=lr, batch=100, beta1=0.9, beta2=0.999, using_adam=True)
+            train_loss, train_err = loss_err(forward(Tensor(X_tr), weights), Tensor(y_tr))
+            test_loss, test_err = loss_err(forward(Tensor(X_te), weights), Tensor(y_te))
+            loss_list.append(test_loss)
+        loss_map[lr] = loss_list
+        print(f'Training with LR = {lr} is done, with accuracy = {1 - test_err}.')
+
+    return loss_map
+
+def plot_loss_curve():
+    X_tr, y_tr, X_te, y_te = parse_mnist()
+    loss_map = train_over_multiple_lr([0.2, 0.05, 0.01, 0.005, 0.002, 0.001, 0.0005, 0.0001], X_tr, y_tr, X_te, y_te)
+
+    plt.figure(figsize=(15, 10))
+    for lr, loss_list in loss_map.items():
+        plt.plot(loss_list, label=f'LR = {lr}', color=np.random.rand(3))
+
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss Curve for Different LR Values')
+    plt.legend()
+    plt.show()
+
+    print('Training loss curves for different LR values:', loss_map)
 
 if __name__ == "__main__":
     X_tr, y_tr, X_te, y_te = parse_mnist()
     weights = set_structure(X_tr.shape[1], 100, y_tr.max() + 1)
-    ## using SGD optimizer 
+    ## using SGD optimizer
     train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr=0.2, batch=100, beta1=0.9, beta2=0.999,
              using_adam=False)
     ## using Adam optimizer
-    train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr=0.001, batch=1000, beta1=0.9, beta2=0.999,
+    train_nn(X_tr, y_tr, X_te, y_te, weights, hidden_dim=100, epochs=20, lr=0.001, batch=100, beta1=0.9, beta2=0.999,
              using_adam=True)
