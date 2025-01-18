@@ -12,13 +12,10 @@ include_directories(
 
 set(NDARRAY_SOURCES
         ndarray/ndarray.cu
-        ndarray/ndarray_kernel.cuh
-        ndarray/nn.cuh
 )
 
 set(OPERATOR_SOURCES
-        operator/op.cpp
-        operator/value.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/autodiff/operators.cpp
 )
 
 add_executable(final
@@ -26,10 +23,11 @@ add_executable(final
         global_curand_generator.cuh
         ${NDARRAY_SOURCES}
         ${OPERATOR_SOURCES}
+        tensor.cpp
 )
 
-set_target_properties(final PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON)
+#set_target_properties(final PROPERTIES
+#        CUDA_SEPARABLE_COMPILATION ON)
 
 target_link_libraries(final PRIVATE cublas curand)
 

@@ -1,7 +1,7 @@
 //
 // Created by timetraveler314 on 10/25/24.
 //
-
+#pragma once
 #ifndef NDARRAY_KERNEL_H
 #define NDARRAY_KERNEL_H
 
@@ -9,7 +9,6 @@
 
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
-#include <cuda/std/span>
 
 #include <thrust/transform.h>
 #include <thrust/execution_policy.h>
@@ -36,7 +35,19 @@ for (int i = blockIdx.x * blockDim.x + threadIdx.x; \
     i < (n); \
     i += blockDim.x * gridDim.x)
 
-namespace tensor_kernel {
+namespace ndarray_kernel {
+    __global__ void ewise_add_kernel_gpu(const TensorDataType* a, const TensorDataType* b, TensorDataType* c, size_t size) {
+        CUDA_KERNEL_LOOP(i, size) {
+            c[i] = a[i] + b[i];
+        }
+    }
+
+    __global__ void ewise_minus_kernel_gpu(const TensorDataType* a, const TensorDataType* b, TensorDataType* c, size_t size) {
+        CUDA_KERNEL_LOOP(i, size) {
+            c[i] = a[i] - b[i];
+        }
+    }
+
     inline void gemm_row_major_gpu(const cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
                         const int m, const int n, const int k, const TensorDataType alpha, const TensorDataType beta,
                         const TensorDataType* A, const TensorDataType* B, TensorDataType* C) {
@@ -108,7 +119,7 @@ namespace tensor_kernel {
     // Parameters:
     //   input: Tensor of shape [batch_size, input_size]
     //   weight: Tensor of shape [output_size, input_size]
-    //   bias: Tensor of shape [output_size], broadcasted to [batch_size, output_size]
+    //   bias: Tensor of shape [output_size], broadcast to [batch_size, output_size]
     //
     // Outputs:
     //   output: Tensor of shape [batch_size, output_size], computed as:

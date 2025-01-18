@@ -9,10 +9,41 @@
 
 #include "op.h"
 
-class Value {
-    std::optional<Op> op; // The operator that produced this value
+class ValueImpl : public std::enable_shared_from_this<ValueImpl> {
+    std::shared_ptr<Op> op; // The operator that produced this value (optional, nullptr if this is a leaf)
     std::vector<Value> args; // The arguments to the operator
+    bool requires_grad = false; // Whether this value requires gradient computation
 
+    std::optional<NdArray> cached_data; // Cached data for this value
+
+public:
+    ValueImpl(std::shared_ptr<Op> op, const std::vector<Value> &args, const bool requires_grad, std::optional<NdArray> cached_data = std::nullopt)
+        : op(std::move(op)), args(args), requires_grad(requires_grad) {}
+
+    // Create a leaf value
+    explicit ValueImpl(const NdArray& data, const bool requires_grad = false): op(nullptr), requires_grad(requires_grad), cached_data(data) {}
+
+    /*
+     * realize() - Compute the value of this value,
+     *             or return the cached value if it has already been computed
+     *
+     * @return The value of this value
+     */
+    NdArray realize() {
+        if (!cached_data) {
+            // Realize the arguments, then compute the value
+            std::vector<NdArray> arg_data;
+            for (const auto& arg : args) {
+                arg_data.push_back(arg->realize());
+            }
+            cached_data = op->compute(arg_data);
+        }
+        return *cached_data;
+    }
+
+    bool isLeaf() const {
+        return !op;
+    }
 };
 
 

@@ -31,6 +31,8 @@ public:
     NdArray(std::vector<int> shape, Device device);
     NdArray(const NdArray& tensor);
     NdArray(NdArray&& tensor) = default;
+    NdArray& operator=(const NdArray& tensor) = default;
+    NdArray& operator=(NdArray&& tensor) = default;
 
     static NdArray ones(std::vector<int> shape, Device device);
     static NdArray iota(std::vector<int> shape, Device device);
@@ -59,11 +61,11 @@ public:
 
     int size() const;
 
-    // friend Tensor operator+(const Tensor& lhs, const Tensor& rhs);
-    // friend Tensor operator-(const Tensor& lhs, const Tensor& rhs);
-    // friend Tensor operator*(const Tensor& lhs, const Tensor& rhs);
-    // friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
-    // friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
+    friend NdArray operator+(const NdArray& lhs, const NdArray& rhs);
+    friend NdArray operator-(const NdArray& lhs, const NdArray& rhs);
+    friend NdArray operator*(const NdArray& lhs, const NdArray& rhs);
+    friend NdArray operator*(TensorDataType scalar, const NdArray& tensor);
+    friend NdArray operator/(const NdArray& lhs, const NdArray& rhs);
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const NdArray& tensor);

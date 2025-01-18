@@ -69,6 +69,7 @@ public:
     device_ptr(device_ptr&&) = default;
 
     device_ptr & operator=(const device_ptr&) = default;
+    device_ptr & operator=(device_ptr&&) = default;
 
     device_ptr copy_to(const Device device) const {
         const auto & self = *this;

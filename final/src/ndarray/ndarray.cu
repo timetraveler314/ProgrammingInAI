@@ -51,7 +51,11 @@ NdArray NdArray::uniform(std::vector<int> shape, Device device) {
     } else {
         NdArray resultGPU(shape, Device::GPU);
         // Use cuRAND
-        curandGenerateUniform(global_curand_generator::get_instance(), resultGPU.getRawData(), resultGPU.size());
+        // curandGenerateUniform(global_curand_generator::get_instance(), resultGPU.getRawData(), resultGPU.size());
+        curandGenerator_t gen;
+        curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+        curandSetPseudoRandomGeneratorSeed(gen, rand());
+        curandGenerateUniform(gen, resultGPU.getRawData(), resultGPU.size());
         return resultGPU;
     }
 }

@@ -6,14 +6,17 @@
 #define OP_H
 
 class NdArray;
-class Value;
+class ValueImpl;
+
+using Value = std::shared_ptr<ValueImpl>;
 
 class Op {
 public:
     virtual ~Op() = default;
 
-    virtual NdArray compute(std::vector<NdArray> args) = 0;
-    virtual std::vector<NdArray> gradient(Value out_grad, std::vector<Value> args) = 0;
+    virtual std::string name() const = 0;
+    virtual NdArray compute(std::vector<NdArray>& args) const = 0;
+    virtual std::vector<NdArray> gradient(Value out_grad, std::vector<Value>& args) const = 0;
 };
 
 

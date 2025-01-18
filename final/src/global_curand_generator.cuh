@@ -12,7 +12,7 @@ class global_curand_generator {
     global_curand_generator() {}
 
 public:
-    static curandGenerator_t get_instance(unsigned long long seed = 42ULL) {
+    static curandGenerator_t& get_instance(unsigned long long seed = 42ULL) {
         static curandGenerator_t instance;
         static bool initialized = false;
 

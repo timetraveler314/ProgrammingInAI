@@ -8,6 +8,50 @@
 #include "ndarray.h"
 #include "ndarray_kernel.cuh"
 
+inline NdArray operator+(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray addition");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        std::cout << "Calling ewise_add_kernel_gpu" << std::endl;
+        ndarray_kernel::ewise_add_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
+
+        return result;
+    }
+}
+
+inline NdArray operator-(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray addition");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        std::cout << "Calling ewise_minus_kernel_gpu" << std::endl;
+        ndarray_kernel::ewise_minus_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
+
+        return result;
+    }
+}
+
 namespace NdArrayNN {
     inline NdArray forward_relu(const NdArray &input) {
         // No shape check needed
@@ -125,7 +169,7 @@ namespace NdArrayNN {
         }
 
         NdArray y({N, Cout}, Device::GPU);
-        tensor_kernel::forward_fc_kernel_gpu(x.getRawData(), w.getRawData(), b.getRawData(), y.getRawData(), N, Cin, Cout);
+        ndarray_kernel::forward_fc_kernel_gpu(x.getRawData(), w.getRawData(), b.getRawData(), y.getRawData(), N, Cin, Cout);
         return y;
     }
 
@@ -150,7 +194,7 @@ namespace NdArrayNN {
         }
 
         NdArray dx({N, Cin}, Device::GPU), dw({Cout, Cin}, Device::GPU), db({Cout}, Device::GPU);
-        tensor_kernel::backward_fc_kernel_gpu(x.getRawData(), w.getRawData(), dy.getRawData(), dx.getRawData(), dw.getRawData(), db.getRawData(), N, Cin, Cout);
+        ndarray_kernel::backward_fc_kernel_gpu(x.getRawData(), w.getRawData(), dy.getRawData(), dx.getRawData(), dw.getRawData(), db.getRawData(), N, Cin, Cout);
         return {dx, dw, db};
     }
 
@@ -171,7 +215,7 @@ namespace NdArrayNN {
         cudaMemset(y.getRawData(), 0, y.size() * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::forward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(x.getRawData() + i * C * H * W, y.getRawData() + i * C * H / 2 * W / 2, C, H, W);
+            ndarray_kernel::forward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(x.getRawData() + i * C * H * W, y.getRawData() + i * C * H / 2 * W / 2, C, H, W);
         }
 
         return y;
@@ -201,7 +245,7 @@ namespace NdArrayNN {
         cudaMemset(dx.getRawData(), 0, dx.size() * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::backward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(
+            ndarray_kernel::backward_max_pooling_2x2_kernel_gpu<<<CudaGetBlocks(C * (H / 2) * (W / 2)), kCudaThreadsNum>>>(
                 dy.getRawData() + i * C * H / 2 * W / 2,
                 x.getRawData() + i * C * H * W,
                 dx.getRawData() + i * C * H * W,
@@ -227,7 +271,7 @@ namespace NdArrayNN {
         }
 
         NdArray y({N, C}, Device::GPU);
-        tensor_kernel::forward_softmax_kernel_gpu(x.getRawData(), y.getRawData(), N, C);
+        ndarray_kernel::forward_softmax_kernel_gpu(x.getRawData(), y.getRawData(), N, C);
 
         return y;
     }
@@ -250,7 +294,7 @@ namespace NdArrayNN {
         cudaMalloc(&d_output_loss, sizeof(TensorDataType));
         cudaMemset(d_output_loss, 0, sizeof(TensorDataType));
 
-        tensor_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), d_output_loss, N, C);
+        ndarray_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), d_output_loss, N, C);
 
         TensorDataType output_loss = 0.0f;
         cudaMemcpy(&output_loss, d_output_loss, sizeof(TensorDataType), cudaMemcpyDeviceToHost);
@@ -275,7 +319,7 @@ namespace NdArrayNN {
         }
 
         NdArray dx({N, C}, Device::GPU);
-        tensor_kernel::backward_softmax_cross_entropy_kernel_gpu<<<CudaGetBlocks(N * C), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), dx.getRawData(), N, C);
+        ndarray_kernel::backward_softmax_cross_entropy_kernel_gpu<<<CudaGetBlocks(N * C), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), dx.getRawData(), N, C);
 
         return dx;
     }
@@ -314,7 +358,7 @@ namespace NdArrayNN {
         cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
+            ndarray_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 im.getRawData() + i * C * H * W, // Current image
                 col,
                 C, H, W, // image C, H, W
@@ -326,7 +370,7 @@ namespace NdArrayNN {
 
             cudaDeviceSynchronize();
 
-            tensor_kernel::gemm_row_major_gpu(
+            ndarray_kernel::gemm_row_major_gpu(
                 handle, CUBLAS_OP_N, CUBLAS_OP_N,
                 K, H * W, C * 9,
                 1.0f, 0.0f,
@@ -379,7 +423,7 @@ namespace NdArrayNN {
         cudaMemset(kernel_grad.getRawData(), 0, kernel_grad.size() * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
+            ndarray_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 im.getRawData() + i * C * H * W, // Current image
                 col,
                 C, H, W, // image C, H, W
@@ -391,7 +435,7 @@ namespace NdArrayNN {
 
             cudaDeviceSynchronize();
 
-            tensor_kernel::gemm_row_major_gpu(
+            ndarray_kernel::gemm_row_major_gpu(
                 handle, CUBLAS_OP_N, CUBLAS_OP_T,
                 K, C * 9, H * W,
                 1.0f, 1.0f,
@@ -409,7 +453,7 @@ namespace NdArrayNN {
         cudaMalloc(&grad_col, C * 9 * H * W * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
-            tensor_kernel::gemm_row_major_gpu(
+            ndarray_kernel::gemm_row_major_gpu(
                 handle, CUBLAS_OP_T, CUBLAS_OP_N,
                 C * 9, H * W, K,
                 1.0f, 0.0f,
@@ -418,7 +462,7 @@ namespace NdArrayNN {
             cudaDeviceSynchronize();
             CHECK_CUDA_ERROR(("gemm_row_major_gpu" + std::to_string(i)).c_str());
 
-            tensor_kernel::col2im_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
+            ndarray_kernel::col2im_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 grad_col,
                 input_grad.getRawData() + i * C * H * W,
                 C, H, W,
