@@ -8,22 +8,22 @@
 
 typedef float TensorDataType;
 
-enum class TensorDevice {
+enum class Device {
     CPU,
     GPU
 };
 
 struct DeviceSpace {
-    TensorDevice device;
+    Device device;
     TensorDataType* space;
     size_t size;
 
-    DeviceSpace(TensorDevice device, size_t size) : device(device), space(nullptr), size(size) {
+    DeviceSpace(Device device, size_t size) : device(device), space(nullptr), size(size) {
         switch (device) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 space = new TensorDataType[size];
             break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 cudaMalloc(&space, size * sizeof(TensorDataType));
             break;
         }
@@ -31,11 +31,11 @@ struct DeviceSpace {
 
     DeviceSpace(const DeviceSpace& deviceSpace) : device(deviceSpace.device), space(nullptr), size(deviceSpace.size) {
         switch (deviceSpace.device) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 space = new TensorDataType[size];
             memcpy(space, deviceSpace.space, size * sizeof(TensorDataType));
             break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 cudaMalloc(&space, size * sizeof(TensorDataType));
             cudaMemcpy(space, deviceSpace.space, size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
             break;
@@ -49,10 +49,10 @@ struct DeviceSpace {
     ~DeviceSpace() {
         if (space)
             switch (device) {
-                case TensorDevice::CPU:
+                case Device::CPU:
                     delete [] space;
                 break;
-                case TensorDevice::GPU:
+                case Device::GPU:
                     cudaFree(space);
                 break;
             }
@@ -62,7 +62,7 @@ struct DeviceSpace {
 class device_ptr : public std::shared_ptr<DeviceSpace> {
 
 public:
-    device_ptr(TensorDevice device, size_t size) : std::shared_ptr<DeviceSpace>(std::make_shared<DeviceSpace>(device, size)) {}
+    device_ptr(Device device, size_t size) : std::shared_ptr<DeviceSpace>(std::make_shared<DeviceSpace>(device, size)) {}
 
     device_ptr() = default;
     device_ptr(const device_ptr&) = default;
@@ -70,27 +70,27 @@ public:
 
     device_ptr & operator=(const device_ptr&) = default;
 
-    device_ptr copy_to(const TensorDevice device) const {
+    device_ptr copy_to(const Device device) const {
         const auto & self = *this;
         auto result = device_ptr(device, self->size);
 
         switch (device) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 switch (self->device) {
-                    case TensorDevice::CPU:
+                    case Device::CPU:
                         memcpy(result->space, self->space, self->size * sizeof(TensorDataType));
                     break;
-                    case TensorDevice::GPU:
+                    case Device::GPU:
                         cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
                     break;
                 }
             break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 switch (self->device) {
-                    case TensorDevice::CPU:
+                    case Device::CPU:
                         cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyHostToDevice);
                     break;
-                    case TensorDevice::GPU:
+                    case Device::GPU:
                         cudaMemcpy(result->space, self->space, self->size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
                     break;
                 }

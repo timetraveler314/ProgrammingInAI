@@ -2,10 +2,10 @@
 // Created by timetraveler314 on 10/25/24.
 //
 
-#ifndef TENSOR_KERNEL_H
-#define TENSOR_KERNEL_H
+#ifndef NDARRAY_KERNEL_H
+#define NDARRAY_KERNEL_H
 
-#include "tensor.h"
+#include "ndarray.h"
 
 #include <cuda_runtime.h>
 #include <cublas_v2.h>

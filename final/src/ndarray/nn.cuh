@@ -2,26 +2,26 @@
 // Created by timetraveler314 on 10/28/24.
 //
 
-#ifndef TENSORNN_CUH
-#define TENSORNN_CUH
+#ifndef NDARRAYNN_CUH
+#define NDARRAYNN_CUH
 
-#include "tensor.h"
-#include "tensor_kernel.h"
+#include "ndarray.h"
+#include "ndarray_kernel.cuh"
 
-namespace TensorNN {
-    inline Tensor forward_relu(const Tensor &input) {
+namespace NdArrayNN {
+    inline NdArray forward_relu(const NdArray &input) {
         // No shape check needed
 
         const int N = input.size();
-        Tensor result(input.getShape(), input.getDevice());
+        NdArray result(input.getShape(), input.getDevice());
 
         switch (input.getDevice()) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N,
                     result.getRawData(),
                     [] (const TensorDataType &x) { return (x > 0) ? x : 0; });
                 break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N,
                     result.getRawData(),
                     [] __device__ (const TensorDataType &x) { return (x > 0) ? x : 0; });
@@ -31,22 +31,22 @@ namespace TensorNN {
         return result;
     }
 
-    inline Tensor backward_relu(const Tensor &input, const Tensor &grad) {
+    inline NdArray backward_relu(const NdArray &input, const NdArray &grad) {
         // Shape check
         if (input.getShape() != grad.getShape()) {
             throw std::runtime_error("Invalid shape for backward_relu");
         }
 
         const int N = input.size();
-        Tensor result(input.getShape(), input.getDevice());
+        NdArray result(input.getShape(), input.getDevice());
 
         switch (input.getDevice()) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
                     [] (const TensorDataType &x, const TensorDataType &g) { return (x > 0) ? g : 0; });
                 break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
                     [] __device__ (const TensorDataType &x, const TensorDataType &g) { return (x > 0) ? g : 0; });
@@ -56,20 +56,20 @@ namespace TensorNN {
         return result;
     }
 
-    inline Tensor forward_sigmoid(const Tensor &input) {
+    inline NdArray forward_sigmoid(const NdArray &input) {
         // No shape check needed
 
         const int N = input.size();
-        Tensor result(input.getShape(), input.getDevice());
+        NdArray result(input.getShape(), input.getDevice());
         auto func = [] __host__ __device__ (const TensorDataType &x) { return 1.0 / (1.0 + expf(-x)); };
 
         switch (input.getDevice()) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N,
                     result.getRawData(),
                     func);
             break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N,
                     result.getRawData(),
                     func);
@@ -79,22 +79,22 @@ namespace TensorNN {
         return result;
     }
 
-    inline Tensor backward_sigmoid(const Tensor &input, const Tensor &grad) {
+    inline NdArray backward_sigmoid(const NdArray &input, const NdArray &grad) {
         // Shape check
         if (input.getShape() != grad.getShape()) {
             throw std::runtime_error("Invalid shape for backward_sigmoid");
         }
 
         const int N = input.size();
-        Tensor result(input.getShape(), input.getDevice());
+        NdArray result(input.getShape(), input.getDevice());
 
         switch (input.getDevice()) {
-            case TensorDevice::CPU:
+            case Device::CPU:
                 thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
                     [] (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
                 break;
-            case TensorDevice::GPU:
+            case Device::GPU:
                 thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
                     [] __device__ (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
@@ -104,7 +104,7 @@ namespace TensorNN {
         return result;
     }
 
-    inline Tensor forward_fc(const Tensor &input, const Tensor &weight, const Tensor &bias) {
+    inline NdArray forward_fc(const NdArray &input, const NdArray &weight, const NdArray &bias) {
         // Shape check
         if (input.getShape().size() != 2 || weight.getShape().size() != 2 || bias.getShape().size() != 1) {
             throw std::runtime_error("Invalid shape for forward_fc");
@@ -118,18 +118,18 @@ namespace TensorNN {
             throw std::runtime_error("Invalid shape for forward_fc");
         }
 
-        auto [device, x, w, b] = Tensor::unifyDevice(input, weight, bias);
+        auto [device, x, w, b] = NdArray::unifyDevice(input, weight, bias);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for forward_fc");
         }
 
-        Tensor y({N, Cout}, TensorDevice::GPU);
+        NdArray y({N, Cout}, Device::GPU);
         tensor_kernel::forward_fc_kernel_gpu(x.getRawData(), w.getRawData(), b.getRawData(), y.getRawData(), N, Cin, Cout);
         return y;
     }
 
-    inline std::tuple<Tensor, Tensor, Tensor> backward_fc(const Tensor &dy, const Tensor &input, const Tensor &weight) {
+    inline std::tuple<NdArray, NdArray, NdArray> backward_fc(const NdArray &dy, const NdArray &input, const NdArray &weight) {
         // Shape check.
         if (dy.getShape().size() != 2 || input.getShape().size() != 2 || weight.getShape().size() != 2) {
             throw std::runtime_error("Invalid shape for backward_fc");
@@ -143,18 +143,18 @@ namespace TensorNN {
             throw std::runtime_error("Invalid shape for backward_fc");
         }
 
-        auto [device, x, w, b] = Tensor::unifyDevice(input, weight, Tensor({1}, TensorDevice::CPU));
+        auto [device, x, w, b] = NdArray::unifyDevice(input, weight, NdArray({1}, Device::CPU));
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for backward_fc");
         }
 
-        Tensor dx({N, Cin}, TensorDevice::GPU), dw({Cout, Cin}, TensorDevice::GPU), db({Cout}, TensorDevice::GPU);
+        NdArray dx({N, Cin}, Device::GPU), dw({Cout, Cin}, Device::GPU), db({Cout}, Device::GPU);
         tensor_kernel::backward_fc_kernel_gpu(x.getRawData(), w.getRawData(), dy.getRawData(), dx.getRawData(), dw.getRawData(), db.getRawData(), N, Cin, Cout);
         return {dx, dw, db};
     }
 
-    inline Tensor forward_max_pooling_2x2(const Tensor &input) {
+    inline NdArray forward_max_pooling_2x2(const NdArray &input) {
         if (input.getShape().size() != 4) {
             throw std::runtime_error("Invalid shape for forward_max_pooling_2x2");
         }
@@ -164,9 +164,9 @@ namespace TensorNN {
         const int H = input.getShape()[2];
         const int W = input.getShape()[3];
 
-        auto [device, x] = Tensor::unifyDevice(input);
+        auto [device, x] = NdArray::unifyDevice(input);
 
-        Tensor y({N, C, H / 2, W / 2}, TensorDevice::GPU);
+        NdArray y({N, C, H / 2, W / 2}, Device::GPU);
 
         cudaMemset(y.getRawData(), 0, y.size() * sizeof(TensorDataType));
 
@@ -177,7 +177,7 @@ namespace TensorNN {
         return y;
     }
 
-    inline Tensor backward_max_pooling_2x2(const Tensor & upstream_grad, const Tensor &input) {
+    inline NdArray backward_max_pooling_2x2(const NdArray & upstream_grad, const NdArray &input) {
         if (upstream_grad.getShape().size() != 4 || input.getShape().size() != 4) {
             throw std::runtime_error("Invalid shape for backward_max_pooling_2x2");
         }
@@ -191,12 +191,12 @@ namespace TensorNN {
             throw std::runtime_error("Invalid shape for backward_max_pooling_2x2");
         }
 
-        auto [device, dy, x] = Tensor::unifyDevice(upstream_grad, input);
-        if (device != TensorDevice::GPU) {
+        auto [device, dy, x] = NdArray::unifyDevice(upstream_grad, input);
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for backward_max_pooling_2x2");
         }
 
-        Tensor dx({N, C, H, W}, TensorDevice::GPU);
+        NdArray dx({N, C, H, W}, Device::GPU);
 
         cudaMemset(dx.getRawData(), 0, dx.size() * sizeof(TensorDataType));
 
@@ -212,7 +212,7 @@ namespace TensorNN {
         return dx;
     }
 
-    inline Tensor forward_softmax(const Tensor &input) {
+    inline NdArray forward_softmax(const NdArray &input) {
         if (input.getShape().size() != 2) {
             throw std::runtime_error("Invalid shape for forward_softmax");
         }
@@ -220,19 +220,19 @@ namespace TensorNN {
         const int N = input.getShape()[0];
         const int C = input.getShape()[1];
 
-        auto [device, x] = Tensor::unifyDevice(input);
+        auto [device, x] = NdArray::unifyDevice(input);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for forward_softmax");
         }
 
-        Tensor y({N, C}, TensorDevice::GPU);
+        NdArray y({N, C}, Device::GPU);
         tensor_kernel::forward_softmax_kernel_gpu(x.getRawData(), y.getRawData(), N, C);
 
         return y;
     }
 
-    inline TensorDataType cross_entropy(const Tensor &input, const Tensor &ground_truth) {
+    inline TensorDataType cross_entropy(const NdArray &input, const NdArray &ground_truth) {
         if (input.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
             throw std::runtime_error("Invalid shape for cross_entropy");
         }
@@ -240,9 +240,9 @@ namespace TensorNN {
         const int N = input.getShape()[0];
         const int C = input.getShape()[1];
 
-        auto [device, x, gt] = Tensor::unifyDevice(input, ground_truth);
+        auto [device, x, gt] = NdArray::unifyDevice(input, ground_truth);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for cross_entropy");
         }
 
@@ -260,7 +260,7 @@ namespace TensorNN {
     }
 
     // The `input` argument here is the output of the softmax layer.
-    inline Tensor backward_softmax_cross_entropy(const Tensor &softmax_output, const Tensor &ground_truth) {
+    inline NdArray backward_softmax_cross_entropy(const NdArray &softmax_output, const NdArray &ground_truth) {
         if (softmax_output.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
             throw std::runtime_error("Invalid shape for backward_softmax_cross_entropy");
         }
@@ -268,19 +268,19 @@ namespace TensorNN {
         const int N = softmax_output.getShape()[0];
         const int C = softmax_output.getShape()[1];
 
-        auto [device, x, gt] = Tensor::unifyDevice(softmax_output, ground_truth);
+        auto [device, x, gt] = NdArray::unifyDevice(softmax_output, ground_truth);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for backward_softmax_cross_entropy");
         }
 
-        Tensor dx({N, C}, TensorDevice::GPU);
+        NdArray dx({N, C}, Device::GPU);
         tensor_kernel::backward_softmax_cross_entropy_kernel_gpu<<<CudaGetBlocks(N * C), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), dx.getRawData(), N, C);
 
         return dx;
     }
 
-    inline Tensor conv2d_3x3(const Tensor &images, const Tensor &kernels) {
+    inline NdArray conv2d_3x3(const NdArray &images, const NdArray &kernels) {
         if (images.getShape().size() != 4 || kernels.getShape().size() != 4) {
             throw std::runtime_error("Invalid shape for conv2d_3x3");
         }
@@ -299,16 +299,16 @@ namespace TensorNN {
             throw std::runtime_error("Invalid shape for conv2d_3x3");
         }
 
-        auto [device, im, k] = Tensor::unifyDevice(images, kernels);
+        auto [device, im, k] = NdArray::unifyDevice(images, kernels);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for conv2d_3x3");
         }
 
         cublasHandle_t handle;
         cublasCreate(&handle);
 
-        Tensor y({N, K, H, W}, TensorDevice::GPU);
+        NdArray y({N, K, H, W}, Device::GPU);
 
         TensorDataType *col;
         cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
@@ -340,7 +340,7 @@ namespace TensorNN {
         return y;
     }
 
-    inline std::tuple<Tensor, Tensor> conv2d_3x3_backward(const Tensor& images, const Tensor& kernels, const Tensor& output_grad) {
+    inline std::tuple<NdArray, NdArray> conv2d_3x3_backward(const NdArray& images, const NdArray& kernels, const NdArray& output_grad) {
         if (images.getShape().size() != 4 || kernels.getShape().size() != 4 || output_grad.getShape().size() != 4) {
             throw std::runtime_error("Invalid shape for conv2d_3x3 backward");
         }
@@ -363,16 +363,16 @@ namespace TensorNN {
             throw std::runtime_error("Output gradient shape does not match expected dimensions");
         }
 
-        auto [device, im, k] = Tensor::unifyDevice(images, kernels);
+        auto [device, im, k] = NdArray::unifyDevice(images, kernels);
 
-        if (device != TensorDevice::GPU) {
+        if (device != Device::GPU) {
             throw std::runtime_error("Unimplemented device for conv2d_3x3 backward");
         }
 
         cublasHandle_t handle;
         cublasCreate(&handle);
 
-        Tensor kernel_grad({K, C, 3, 3}, TensorDevice::GPU);
+        NdArray kernel_grad({K, C, 3, 3}, Device::GPU);
         TensorDataType *col;
         cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
 
@@ -403,7 +403,7 @@ namespace TensorNN {
 
         // Compute the input gradient
 
-        Tensor input_grad({N, C, H, W}, TensorDevice::GPU);
+        NdArray input_grad({N, C, H, W}, Device::GPU);
 
         TensorDataType *grad_col;
         cudaMalloc(&grad_col, C * 9 * H * W * sizeof(TensorDataType));
@@ -439,4 +439,4 @@ namespace TensorNN {
 
 }
 
-#endif //TENSORNN_CUH
+#endif //NDARRAYNN_CUH

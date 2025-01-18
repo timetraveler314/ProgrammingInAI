@@ -2,11 +2,11 @@
 // Created by timetraveler314 on 9/22/24.
 //
 
-#include "tensor.h"
+#include "ndarray.h"
 
-#include "global_curand_generator.cuh"
+#include "../global_curand_generator.cuh"
 
-Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device), shape(std::move(shape)) {
+NdArray::NdArray(std::vector<int> shape, const Device device): device(device), shape(std::move(shape)) {
     int bufferSize = 1;
     for (const auto dim: this->shape) {
         bufferSize *= dim;
@@ -15,74 +15,74 @@ Tensor::Tensor(std::vector<int> shape, const TensorDevice device): device(device
     this->data = device_ptr(device, bufferSize);
 }
 
-Tensor::Tensor(const Tensor &tensor) : device(tensor.device), shape(tensor.shape), data(tensor.data) {}
+NdArray::NdArray(const NdArray &tensor) : device(tensor.device), shape(tensor.shape), data(tensor.data) {}
 
-Tensor Tensor::ones(std::vector<int> shape, TensorDevice device) {
-    Tensor result(shape, TensorDevice::CPU);
+NdArray NdArray::ones(std::vector<int> shape, Device device) {
+    NdArray result(shape, Device::CPU);
     for (int i = 0; i < result.size(); i++) {
         result.data->space[i] = 1.0;
     }
 
     switch (device) {
-        case TensorDevice::CPU:
+        case Device::CPU:
             return result;
-        case TensorDevice::GPU:
+        case Device::GPU:
             return result.gpu();
     }
     return result;
 }
 
-Tensor Tensor::iota(std::vector<int> shape, TensorDevice device) {
-    Tensor result(shape, TensorDevice::CPU);
+NdArray NdArray::iota(std::vector<int> shape, Device device) {
+    NdArray result(shape, Device::CPU);
     for (int i = 0; i < result.size(); i++) {
         result.data->space[i] = i;
     }
-    return device == TensorDevice::CPU ? result : result.gpu();
+    return device == Device::CPU ? result : result.gpu();
 }
 
-Tensor Tensor::uniform(std::vector<int> shape, TensorDevice device) {
+NdArray NdArray::uniform(std::vector<int> shape, Device device) {
     constexpr TensorDataType low = 0.0f, high = 1.0f;
-    if (device == TensorDevice::CPU) {
-        Tensor resultCPU(shape, TensorDevice::CPU);
+    if (device == Device::CPU) {
+        NdArray resultCPU(shape, Device::CPU);
         for (int i = 0; i < resultCPU.size(); i++) {
             resultCPU.getRawData()[i] = low + static_cast<TensorDataType>(rand()) / RAND_MAX * (high - low);
         }
         return resultCPU;
     } else {
-        Tensor resultGPU(shape, TensorDevice::GPU);
+        NdArray resultGPU(shape, Device::GPU);
         // Use cuRAND
         curandGenerateUniform(global_curand_generator::get_instance(), resultGPU.getRawData(), resultGPU.size());
         return resultGPU;
     }
 }
 
-Tensor Tensor::view(const std::vector<int> &newShape) const {
-    Tensor newTensor(newShape, device);
+NdArray NdArray::view(const std::vector<int> &newShape) const {
+    NdArray newTensor(newShape, device);
     newTensor.data = data;
     return newTensor;
 }
 
-Tensor Tensor::gpu() const {
-    Tensor gpuTensor(shape, TensorDevice::GPU);
-    gpuTensor.data = data.copy_to(TensorDevice::GPU);
+NdArray NdArray::gpu() const {
+    NdArray gpuTensor(shape, Device::GPU);
+    gpuTensor.data = data.copy_to(Device::GPU);
     return gpuTensor;
 }
 
-TensorDevice Tensor::getDevice() const {
+Device NdArray::getDevice() const {
     return device;
 }
 
-TensorDataType * Tensor::getRawData() const {
+TensorDataType * NdArray::getRawData() const {
     return data->space;
 }
 
-Tensor Tensor::cpu() const {
-    Tensor cpuTensor(shape, TensorDevice::CPU);
-    cpuTensor.data = data.copy_to(TensorDevice::CPU);
+NdArray NdArray::cpu() const {
+    NdArray cpuTensor(shape, Device::CPU);
+    cpuTensor.data = data.copy_to(Device::CPU);
     return cpuTensor;
 }
 
-int Tensor::size() const {
+int NdArray::size() const {
     int bufferSize = 1;
     for (const auto dim : shape) {
         bufferSize *= dim;
@@ -90,9 +90,9 @@ int Tensor::size() const {
     return bufferSize;
 }
 
-void Tensor::print(std::ostream &os, const int depth, const int offset) const {
-    if (device == TensorDevice::GPU) {
-        Tensor cpuTensor = cpu();
+void NdArray::print(std::ostream &os, const int depth, const int offset) const {
+    if (device == Device::GPU) {
+        NdArray cpuTensor = cpu();
         cpuTensor.print(os, depth, offset);
         return;
     }
@@ -124,17 +124,17 @@ void Tensor::print(std::ostream &os, const int depth, const int offset) const {
     }
 }
 
-std::string Tensor::toString() const {
+std::string NdArray::toString() const {
     std::stringstream ss;
     print(ss);
     return ss.str();
 }
 
-std::vector<int> Tensor::getShape() const {
+std::vector<int> NdArray::getShape() const {
     return this->shape;
 }
 
-std::ostream &operator<<(std::ostream &os, const Tensor &tensor) {
+std::ostream &operator<<(std::ostream &os, const NdArray &tensor) {
     tensor.print(os);
     return os;
 }
