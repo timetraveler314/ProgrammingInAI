@@ -1,10 +1,8 @@
-import code
-
 import numpy as np
 import torch
-
 from torchvision import datasets
 from torchvision.transforms import v2
+from tqdm import tqdm  # 导入 tqdm
 
 new_mirror = 'https://ossci-datasets.s3.amazonaws.com/mnist'
 datasets.MNIST.resources = [
@@ -14,54 +12,6 @@ datasets.MNIST.resources = [
 
 from Designant import *
 
-import numpy as np
-
-# 定义网络的参数
-n, h, o = 784, 128, 10  # 输入、隐藏层和输出层的大小
-np.random.seed(42)
-
-W1 = np.random.randn(h, n) * 0.01
-b1 = np.zeros((h, 1))
-W2 = np.random.randn(o, h) * 0.01
-b2 = np.zeros((o, 1))
-
-
-# 前向传播的计算
-def forward(x):
-    z1 = np.dot(x, W1.T) + b1
-    a1 = np.maximum(0, z1)  # ReLU激活
-    z2 = np.dot(a1, W2.T) + b2
-    a2 = softmax(z2)  # Softmax输出
-    return a1, a2, z1, z2
-
-
-def softmax(x):
-    exp_x = np.exp(x - np.max(x, axis=0, keepdims=True))  # 稳定性修正
-    return exp_x / np.sum(exp_x, axis=0, keepdims=True)
-
-
-# 损失函数（交叉熵损失）
-def compute_loss(y, a2):
-    m = y.shape[0]
-    loss = -np.sum(np.log(a2) * y) / m  # 平均损失
-    return loss
-
-
-# 反向传播
-def backward(x, y, a1, a2, z1, z2):
-    m = y.shape[0]  # 样本数量
-
-    # 计算输出层的梯度
-    dz2 = a2 - y  # Softmax的梯度
-    dW2 = np.dot(dz2.T, a1) / m  # 权重的梯度
-    db2 = np.sum(dz2, axis=0, keepdims=True) / m  # 偏置的梯度
-
-    # 计算隐藏层的梯度
-    dz1 = np.dot(dz2, W2) * (z1 > 0)  # ReLU的梯度
-    dW1 = np.dot(dz1.T, x) / m  # 权重的梯度
-    db1 = np.sum(dz1, axis=0, keepdims=True) / m  # 偏置的梯度
-
-    return dW1, db1, dW2, db2
 
 class SimpleNet:
     def __init__(self, input_size, hidden_size, output_size, batch_size):
@@ -79,6 +29,13 @@ class SimpleNet:
     def loss(self, predictions, targets):
         # 计算Softmax交叉熵损失
         return nnn.functional.softmax_cross_entropy(predictions, targets)
+
+    def accuracy(self, predictions, targets):
+        # 计算准确率
+        predicted = predictions.numpy().argmax(axis=1)
+        correct = (predicted == targets.numpy()).sum()
+        return correct / targets.shape()[0]
+
 
 def train_mnist():
     # 数据参数
@@ -103,73 +60,50 @@ def train_mnist():
     lr = 0.1
     epochs = 10
 
+    # 训练开始
     for epoch in range(epochs):
         total_loss = 0
-        for batch_idx, (data, target) in enumerate(train_loader):
-            if batch_idx % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs}, Batch {batch_idx + 1}/{len(train_loader)}")
-            # 将数据从numpy转换为自定义的Tensor
-            data = data.view(min(batch_size, data.shape[0]), -1)
-            target = target.numpy()
-            # print(target)
+        correct = 0
+        total_samples = 0
 
-            data_tensor = Tensor.from_numpy(data, True)
-            target_tensor = Tensor.from_numpy(target, False)
+        # 使用 tqdm 包装数据加载器，以显示进度条
+        with tqdm(enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch + 1}/{epochs}") as pbar:
+            for batch_idx, (data, target) in pbar:
+                # 将数据从numpy转换为自定义的Tensor
+                data = data.view(min(batch_size, data.shape[0]), -1)
+                target = target.numpy()
 
-            # 前向传播
-            my_z1, predictions = net.forward(data_tensor)
+                data_tensor = Tensor.from_numpy(data, True)
+                target_tensor = Tensor.from_numpy(target, False)
 
-            # 计算损失
-            loss = net.loss(predictions, target_tensor)
+                # 前向传播
+                my_z1, predictions = net.forward(data_tensor)
 
-            # 反向传播
-            loss.backward()
+                # 计算损失
+                loss = net.loss(predictions, target_tensor)
 
-            # 以 NumPy 为 baseline, 检查梯度是否正确
-            # global W1, b1, W2, b2
-            # W1 = net.fc1.weight.numpy()
-            # b1 = net.fc1.bias.numpy()
-            # W2 = net.fc2.weight.numpy()
-            # b2 = net.fc2.bias.numpy()
-            # a1, a2, z1, z2 = forward(data)
+                # 反向传播
+                loss.backward()
 
-            def softmax_np(x):
-                e_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-                return e_x / np.sum(e_x, axis=1, keepdims=True)
+                # 更新参数
+                for layer in [net.fc1, net.fc2]:
+                    layer.weight.update(layer.weight - lr * layer.weight.grad())
+                    layer.bias.update(layer.bias - lr * layer.bias.grad())
 
-            def cross_entropy_loss_np(softmax_output, labels):
-                N = softmax_output.shape[0]
-                log_likelihood = -np.log(softmax_output[np.arange(N), labels])
-                return np.sum(log_likelihood) / N
+                # 累计损失
+                total_loss += loss.numpy()
 
-            def combined_backward(softmax_output, labels):
-                grad = softmax_output.copy()
-                grad[np.arange(batch_size), labels] -= 1
-                return grad
+                # 计算准确率
+                accuracy = net.accuracy(predictions, target_tensor)
+                correct += accuracy * batch_size
+                total_samples += batch_size
 
-            # # Predictions Comparison
-            # np.testing.assert_allclose(predictions.numpy(), z2, atol=1e-6)
-            #
-            # y = np.eye(10)[target]
-            #
-            # loss_numpy = cross_entropy_loss_np(softmax_np(z2), target)
-            #
-            # dW1, db1, dW2, db2 = backward(data, y, a1, a2, z1, z2)
+                # 更新进度条
+                pbar.set_postfix(loss=total_loss / (batch_idx + 1), accuracy=correct / total_samples)
 
-            # Print max in gradient
-            # print("Max in gradient")
-            # print(np.max(dW1))
-            # print(np.max(net.fc1.weight.grad().numpy()))
-            # np.testing.assert_allclose(dW2, net.fc2.weight.grad().numpy(), rtol=1e-4)
-            # 更新参数
-            for layer in [net.fc1, net.fc2]:
-                layer.weight.update(layer.weight - lr * layer.weight.grad())
-                layer.bias.update(layer.bias - lr * layer.bias.grad())
+        print(
+            f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(train_loader)}, Accuracy: {correct / total_samples}")
 
-            # 累计损失
-            total_loss += loss.numpy()
-
-        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(train_loader)}")
 
 if __name__ == "__main__":
     train_mnist()
