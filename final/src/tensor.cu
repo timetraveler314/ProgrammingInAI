@@ -31,7 +31,7 @@ Tensor Tensor::operator-(const Tensor &other) const {
 }
 
 Tensor operator*(TensorDataType scalar, const Tensor &tensor) {
-    return std::make_shared<TensorImpl>(std::make_unique<Operators::ScalarProduct>(), std::vector{tensor.to_value()}, tensor.isRequiresGrad());
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::ScalarProduct>(scalar), std::vector{tensor.to_value()}, tensor.isRequiresGrad());
 }
 
 Tensor Tensor::operator%(const Tensor &other) const {

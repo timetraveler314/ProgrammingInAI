@@ -39,7 +39,15 @@ void compute_gradients(const Tensor &out_tensor, const Tensor &out_grad) {
         if (node->getOp()) {
             ss << node->getOp()->name() << " -> " << std::endl;
         } else {
-            ss << "<leaf> -> " << std::endl;
+            const auto tensor = Tensor(std::dynamic_pointer_cast<TensorImpl>(node));
+            ss << "<leaf requires_grad=" << tensor.isRequiresGrad() << ", shape=[";
+            for (int i = 0; i < tensor.getShape().size(); i++) {
+                ss << tensor.getShape()[i];
+                if (i != tensor.getShape().size() - 1) {
+                    ss << ", ";
+                }
+            }
+            ss << "]>" << std::endl;
         }
     }
 

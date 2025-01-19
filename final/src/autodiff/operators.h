@@ -39,6 +39,8 @@ namespace Operators {
     public:
         TensorDataType scalar;
 
+        explicit ScalarProduct(const TensorDataType scalar): scalar(scalar) {}
+
         std::string name() const override {
             return "<ScalarProduct by " + std::to_string(scalar) + ">";
         }

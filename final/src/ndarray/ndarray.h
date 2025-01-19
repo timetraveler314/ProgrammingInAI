@@ -42,6 +42,8 @@ public:
     static NdArray xavier(const std::vector<int> &shape, Device device);
     static NdArray from_raw_data(std::vector<int> shape, Device device, TensorDataType* data);
 
+    void copy_from(const NdArray &tensor) const;
+
     NdArray view(const std::vector<int> &newShape) const;
     NdArray reshape(const std::vector<int> &newShape) const;
 

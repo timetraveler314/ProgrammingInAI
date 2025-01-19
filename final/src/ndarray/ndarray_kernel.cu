@@ -191,7 +191,7 @@ __global__ void ndarray_kernel::backward_softmax_cross_entropy_kernel_gpu(Tensor
         int sample_idx = i / num_classes;
         int class_idx = i % num_classes;
 
-        output_grad[i] = softmax_output[i] - (target[sample_idx] == class_idx);
+        output_grad[i] = (softmax_output[i] - (target[sample_idx] == class_idx)) / batch_size;
     }
 }
 

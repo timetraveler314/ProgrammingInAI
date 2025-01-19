@@ -136,6 +136,20 @@ NdArray NdArray::from_raw_data(std::vector<int> shape, Device device, TensorData
     return result;
 }
 
+void NdArray::copy_from(const NdArray &tensor) const {
+    if (device == Device::CPU && tensor.device == Device::CPU) {
+        for (int i = 0; i < size(); i++) {
+            getRawData()[i] = tensor.getRawData()[i];
+        }
+    } else if (device == Device::GPU && tensor.device == Device::GPU) {
+        cudaMemcpy(getRawData(), tensor.getRawData(), size() * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+    } else if (device == Device::CPU && tensor.device == Device::GPU) {
+        cudaMemcpy(getRawData(), tensor.getRawData(), size() * sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+    } else {
+        cudaMemcpy(getRawData(), tensor.getRawData(), size() * sizeof(TensorDataType), cudaMemcpyHostToDevice);
+    }
+}
+
 NdArray NdArray::view(const std::vector<int> &newShape) const {
     NdArray newTensor(newShape, device);
     newTensor.data = data;

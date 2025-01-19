@@ -91,7 +91,7 @@ public:
     void update(const Tensor& new_tensor) const {
         if (!impl->isLeaf()) throw std::runtime_error("Cannot update non-leaf tensor");
 
-        impl->cached_data = new_tensor.getImpl()->realize();
+        impl->cached_data->copy_from(new_tensor.getImpl()->realize());
     }
 
     /* Tensor operator/operations */
