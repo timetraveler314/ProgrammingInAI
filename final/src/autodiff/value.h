@@ -60,6 +60,8 @@ public:
     auto& getOp() {
         return op;
     }
+
+    friend class Tensor;
 };
 
 

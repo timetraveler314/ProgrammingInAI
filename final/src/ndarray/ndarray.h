@@ -37,6 +37,7 @@ public:
     static NdArray ones(std::vector<int> shape, Device device);
     static NdArray iota(std::vector<int> shape, Device device);
     static NdArray uniform(std::vector<int> shape, Device device);
+    static NdArray from_raw_data(std::vector<int> shape, Device device, TensorDataType* data);
 
     NdArray view(const std::vector<int> &newShape) const;
 
@@ -63,9 +64,15 @@ public:
 
     friend NdArray operator+(const NdArray& lhs, const NdArray& rhs);
     friend NdArray operator-(const NdArray& lhs, const NdArray& rhs);
+    NdArray operator-() const; // Negate
     friend NdArray operator*(const NdArray& lhs, const NdArray& rhs);
     friend NdArray operator*(TensorDataType scalar, const NdArray& tensor);
     friend NdArray operator/(const NdArray& lhs, const NdArray& rhs);
+
+    // Matrix multiplication
+    friend NdArray operator%(const NdArray& lhs, const NdArray& rhs);
+
+    NdArray transpose() const;
 
     void print(std::ostream& os, int depth = 0, int offset = 0) const;
     friend std::ostream& operator<<(std::ostream& os, const NdArray& tensor);

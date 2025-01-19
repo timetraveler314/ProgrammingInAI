@@ -8,50 +8,6 @@
 #include "ndarray.h"
 #include "ndarray_kernel.cuh"
 
-inline NdArray operator+(const NdArray &lhs, const NdArray &rhs) {
-    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
-
-    if (x.getShape() != y.getShape()) {
-        throw std::runtime_error("Shape mismatch in NdArray addition");
-    }
-
-    if (device == Device::CPU) {
-        NdArray result(lhs.getShape(), Device::CPU);
-        for (int i = 0; i < result.size(); i++) {
-            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
-        }
-        return result;
-    } else {
-        NdArray result(lhs.getShape(), Device::GPU);
-        std::cout << "Calling ewise_add_kernel_gpu" << std::endl;
-        ndarray_kernel::ewise_add_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
-
-        return result;
-    }
-}
-
-inline NdArray operator-(const NdArray &lhs, const NdArray &rhs) {
-    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
-
-    if (x.getShape() != y.getShape()) {
-        throw std::runtime_error("Shape mismatch in NdArray addition");
-    }
-
-    if (device == Device::CPU) {
-        NdArray result(lhs.getShape(), Device::CPU);
-        for (int i = 0; i < result.size(); i++) {
-            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
-        }
-        return result;
-    } else {
-        NdArray result(lhs.getShape(), Device::GPU);
-        std::cout << "Calling ewise_minus_kernel_gpu" << std::endl;
-        ndarray_kernel::ewise_minus_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
-
-        return result;
-    }
-}
-
 namespace NdArrayNN {
     inline NdArray forward_relu(const NdArray &input) {
         // No shape check needed
@@ -136,12 +92,18 @@ namespace NdArrayNN {
             case Device::CPU:
                 thrust::transform(thrust::host, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
-                    [] (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
+                    [] (const TensorDataType &x, const TensorDataType &g) {
+                        const TensorDataType s = 1.0 / (1.0 + expf(-x));
+                        return s * (1 - s) * g;
+                    });
                 break;
             case Device::GPU:
                 thrust::transform(thrust::device, input.getRawData(), input.getRawData() + N, grad.getRawData(),
                     result.getRawData(),
-                    [] __device__ (const TensorDataType &x, const TensorDataType &g) { return x * (1 - x) * g; });
+                    [] __device__ (const TensorDataType &x, const TensorDataType &g) {
+                        const TensorDataType s = 1.0 / (1.0 + expf(-x));
+                        return s * (1 - s) * g;
+                    });
             break;
         }
 

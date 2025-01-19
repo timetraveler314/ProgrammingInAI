@@ -4,7 +4,11 @@
 
 #include "ndarray.h"
 
+#include <ndarray_kernel.cuh>
+#include <nn.cuh>
+
 #include "../global_curand_generator.cuh"
+#include "../utils/global_cublas_handle.cuh"
 
 NdArray::NdArray(std::vector<int> shape, const Device device): device(device), shape(std::move(shape)) {
     int bufferSize = 1;
@@ -60,6 +64,18 @@ NdArray NdArray::uniform(std::vector<int> shape, Device device) {
     }
 }
 
+NdArray NdArray::from_raw_data(std::vector<int> shape, Device device, TensorDataType *data) {
+    NdArray result(shape, device);
+    if (device == Device::CPU) {
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = data[i];
+        }
+    } else {
+        cudaMemcpy(result.getRawData(), data, result.size() * sizeof(TensorDataType), cudaMemcpyHostToDevice);
+    }
+    return result;
+}
+
 NdArray NdArray::view(const std::vector<int> &newShape) const {
     NdArray newTensor(newShape, device);
     newTensor.data = data;
@@ -92,6 +108,40 @@ int NdArray::size() const {
         bufferSize *= dim;
     }
     return bufferSize;
+}
+
+NdArray NdArray::operator-() const {
+    if (device == Device::CPU) {
+        NdArray result(shape, Device::CPU);
+        for (int i = 0; i < size(); i++) {
+            result.getRawData()[i] = -getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(shape, Device::GPU);
+        thrust::transform(thrust::device, getRawData(), getRawData() + size(), result.getRawData(), thrust::negate<TensorDataType>());
+        return result;
+    }
+}
+
+NdArray NdArray::transpose() const {
+    if (shape.size() != 2) {
+        throw std::runtime_error("Transpose is only supported for 2D tensors");
+    }
+
+    NdArray result({shape[1], shape[0]}, device);
+    if (device == Device::CPU) {
+        for (int i = 0; i < shape[0]; i++) {
+            for (int j = 0; j < shape[1]; j++) {
+                result.getRawData()[j * shape[0] + i] = getRawData()[i * shape[1] + j];
+            }
+        }
+    } else {
+        // Use Sgeam to transpose the matrix
+        const TensorDataType alpha = 1.0f, beta = 0.0f;
+        cublasSgeam(global_cublas_handle::get_instance(), CUBLAS_OP_T, CUBLAS_OP_T, shape[0], shape[1], &alpha, getRawData(), shape[1], &beta, getRawData(), shape[1], result.getRawData(), shape[0]);
+    }
+    return result;
 }
 
 void NdArray::print(std::ostream &os, const int depth, const int offset) const {
@@ -138,7 +188,86 @@ std::vector<int> NdArray::getShape() const {
     return this->shape;
 }
 
+/*
+ * operator% - Matrix multiplication
+ *
+ * @param lhs: m x k matrix
+ *        rhs: k x n matrix
+ *
+ * @return m x n matrix
+ */
+NdArray operator%(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    int m = x.getShape()[0];
+    int k = x.getShape()[1];
+    int n = y.getShape()[1];
+
+    if (x.getShape()[1] != y.getShape()[0]) throw std::runtime_error("Shape mismatch in matrix multiplication");
+
+    if (device == Device::CPU) {
+        NdArray result({m, n}, Device::CPU);
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < n; j++) {
+                result.getRawData()[i * n + j] = 0;
+                for (int l = 0; l < k; l++) {
+                    result.getRawData()[i * n + j] += x.getRawData()[i * k + l] * y.getRawData()[l * n + j];
+                }
+            }
+        }
+        return result;
+    } else {
+        NdArray result({m, n}, Device::GPU);
+        ndarray_kernel::gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, 1.0f, 0.0f, x.getRawData(), y.getRawData(), result.getRawData());
+        return result;
+    }
+}
+
 std::ostream &operator<<(std::ostream &os, const NdArray &tensor) {
     tensor.print(os);
     return os;
+}
+
+NdArray operator+(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray addition");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        std::cout << "Calling ewise_add_kernel_gpu" << std::endl;
+        ndarray_kernel::ewise_add_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
+
+        return result;
+    }
+}
+
+NdArray operator-(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray operator-");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] + y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        std::cout << "Calling ewise_minus_kernel_gpu" << std::endl;
+        ndarray_kernel::ewise_minus_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
+
+        return result;
+    }
 }

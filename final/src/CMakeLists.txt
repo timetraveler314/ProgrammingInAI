@@ -19,11 +19,16 @@ set(AUTODIFF_SOURCES
         autodiff/autodiff.cu
 )
 
+set(UTILS_SOURCES
+        utils/global_cublas_handle.cu
+)
+
 add_executable(final
         main.cu
         global_curand_generator.cuh
         ${NDARRAY_SOURCES}
         ${AUTODIFF_SOURCES}
+        ${UTILS_SOURCES}
         tensor.cu
 )
 

@@ -68,12 +68,22 @@ public:
         return Tensor(impl->grad.value(), false);
     }
 
-    void backward(const Tensor& out_grad);
+    void backward();
 
     // Comparison operators, for std::map
     bool operator<(const Tensor& other) const {
         return impl < other.impl;
     }
+
+    bool isRequiresGrad() const {
+        return impl->isRequiresGrad();
+    }
+
+    /* Tensor operator/operations */
+    Tensor operator+(const Tensor& other) const;
+    Tensor operator-() const;
+    Tensor operator-(const Tensor& other) const;
+    Tensor operator%(const Tensor& other) const;
 };
 
 inline Tensor::Tensor(const NdArray &data, const bool requires_grad): impl(std::make_shared<TensorImpl>(data, requires_grad)) {}
