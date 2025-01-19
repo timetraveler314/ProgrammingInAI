@@ -9,7 +9,32 @@
 #include "autodiff/op.h"
 #include "autodiff/operators.h"
 
-class TensorImpl;
+// using Tensor = std::shared_ptr<TensorImpl>;
+
+class TensorImpl : public ValueImpl {
+    std::optional<NdArray> grad;
+
+public:
+    TensorImpl(const std::vector<int>& shape, Device device, const bool require_grad = false)
+        : ValueImpl(NdArray(shape, device), require_grad), grad(NdArray(shape, device)) {
+    }
+
+    // Create a leaf value with the given data
+    explicit TensorImpl(const NdArray& data, const bool require_grad = false)
+        : ValueImpl(data, require_grad), grad(NdArray(data.getShape(), data.getDevice())) {
+    }
+
+    // Create a Tensor from operation (Op) and arguments (Value's)
+    TensorImpl(std::unique_ptr<Op> op, const std::vector<Value>& args, const bool require_grad = false)
+        : ValueImpl(std::move(op), args, require_grad), grad(std::nullopt) {
+    }
+
+    // static Tensor uniform(const std::vector<int>& shape, const Device device, const bool require_grad = false) {
+    //     return std::make_shared<TensorImpl>(NdArray::uniform(shape, device), require_grad);
+    // }
+
+    friend class Tensor;
+};
 
 class Tensor {
     std::shared_ptr<TensorImpl> impl;
@@ -29,39 +54,25 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream & lhs, const Tensor & rhs);
-};
 
-// using Tensor = std::shared_ptr<TensorImpl>;
-
-class TensorImpl : public ValueImpl {
-    Tensor grad{nullptr};
-
-public:
-    TensorImpl(const std::vector<int>& shape, Device device, const bool require_grad = false)
-        : ValueImpl(NdArray(shape, device), require_grad) {
-        if (require_grad) {
-            grad = std::make_shared<TensorImpl>(shape, device, false);
-        }
+    Value to_value() const {
+        return std::dynamic_pointer_cast<ValueImpl>(impl);
     }
 
-    // Create a leaf value with the given data
-    explicit TensorImpl(const NdArray& data, const bool require_grad = false)
-        : ValueImpl(data, require_grad) {
-        if (require_grad) {
-            grad = std::make_shared<TensorImpl>(data.getShape(), data.getDevice(), false);
-        }
+    void setGrad(NdArray grad) const {
+        impl->grad = std::move(grad);
     }
 
-    // Create a Tensor from operation (Op) and arguments (Value's)
-    TensorImpl(std::unique_ptr<Op> op, const std::vector<Value>& args, const bool require_grad = false)
-        : ValueImpl(std::move(op), args, require_grad) {
-        if (require_grad) {
-            grad = std::make_shared<TensorImpl>(args[0]->realize().getShape(), args[0]->realize().getDevice(), false);
-        }
+    Tensor grad() const {
+        if (!impl->grad.has_value()) throw std::runtime_error("No gradient available");
+        return Tensor(impl->grad.value(), false);
     }
 
-    static Tensor uniform(const std::vector<int>& shape, const Device device, const bool require_grad = false) {
-        return std::make_shared<TensorImpl>(NdArray::uniform(shape, device), require_grad);
+    void backward(const Tensor& out_grad);
+
+    // Comparison operators, for std::map
+    bool operator<(const Tensor& other) const {
+        return impl < other.impl;
     }
 };
 

@@ -16,7 +16,7 @@ public:
 
     virtual std::string name() const = 0;
     virtual NdArray compute(std::vector<NdArray>& args) const = 0;
-    virtual std::vector<NdArray> gradient(Value out_grad, std::vector<Value>& args) const = 0;
+    virtual std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const = 0;
 };
 
 

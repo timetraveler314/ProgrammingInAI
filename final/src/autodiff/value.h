@@ -5,6 +5,8 @@
 #ifndef VALUE_H
 #define VALUE_H
 
+#include <memory>
+#include <ndarray.h>
 #include <optional>
 
 #include "op.h"
@@ -19,6 +21,8 @@ class ValueImpl : public std::enable_shared_from_this<ValueImpl> {
 public:
     ValueImpl(std::shared_ptr<Op> op, const std::vector<Value> &args, const bool requires_grad, std::optional<NdArray> cached_data = std::nullopt)
         : op(std::move(op)), args(args), requires_grad(requires_grad) {}
+
+    virtual ~ValueImpl() = default;
 
     // Create a leaf value
     explicit ValueImpl(const NdArray& data, const bool requires_grad = false): op(nullptr), requires_grad(requires_grad), cached_data(data) {}
@@ -43,6 +47,18 @@ public:
 
     bool isLeaf() const {
         return !op;
+    }
+
+    bool isRequiresGrad() const {
+        return requires_grad;
+    }
+
+    auto& getArgs() {
+        return args;
+    }
+
+    auto& getOp() {
+        return op;
     }
 };
 
