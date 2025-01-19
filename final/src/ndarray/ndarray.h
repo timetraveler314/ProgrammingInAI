@@ -34,12 +34,16 @@ public:
     NdArray& operator=(const NdArray& tensor) = default;
     NdArray& operator=(NdArray&& tensor) = default;
 
+    static NdArray zeros_like(const NdArray & nds);
+    static NdArray zeros(std::vector<int> shape, Device device);
     static NdArray ones(std::vector<int> shape, Device device);
     static NdArray iota(std::vector<int> shape, Device device);
     static NdArray uniform(std::vector<int> shape, Device device);
+    static NdArray xavier(const std::vector<int> &shape, Device device);
     static NdArray from_raw_data(std::vector<int> shape, Device device, TensorDataType* data);
 
     NdArray view(const std::vector<int> &newShape) const;
+    NdArray reshape(const std::vector<int> &newShape) const;
 
     // Nothing needed here. Data pointer will be freed automatically by
     // the shared_ptr managing DeviceSpace.

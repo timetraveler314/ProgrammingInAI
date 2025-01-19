@@ -32,10 +32,10 @@ int main() {
     Tensor y = x % w + b;
 
     // 激活函数：逐元素 ReLU（将负值置为0）
-    Tensor relu_y = TensorNN::ReLU(y);
+    Tensor relu_y = TensorFunctional::ReLU(y);
 
     // Sigmoid 激活函数：逐元素 Sigmoid
-    Tensor sigmoid_y = TensorNN::Sigmoid(relu_y);
+    Tensor sigmoid_y = TensorFunctional::Sigmoid(relu_y);
 
     cout << sigmoid_y << endl;
 

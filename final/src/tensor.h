@@ -44,6 +44,9 @@ public:
 
     // User Interface
     explicit Tensor(const NdArray& data, const bool requires_grad = false);
+    static Tensor xavier(const std::vector<int>& shape, const Device device, const bool require_grad = false) {
+        return Tensor(NdArray::xavier(shape, device), require_grad);
+    }
 
     operator std::shared_ptr<TensorImpl>() const {
         return impl;
@@ -79,11 +82,31 @@ public:
         return impl->isRequiresGrad();
     }
 
+    Tensor detach() const {
+        return Tensor(impl->realize(), false);
+    }
+
+    /* update - update the tensor with new data, leaving the computation graph behind
+     * used for updating the weights of the model */
+    void update(const Tensor& new_tensor) const {
+        if (!impl->isLeaf()) throw std::runtime_error("Cannot update non-leaf tensor");
+
+        impl->cached_data = new_tensor.getImpl()->realize();
+    }
+
     /* Tensor operator/operations */
     Tensor operator+(const Tensor& other) const;
     Tensor operator-() const;
     Tensor operator-(const Tensor& other) const;
+    friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
     Tensor operator%(const Tensor& other) const;
+
+    Tensor transpose() const;
+    Tensor reshape(const std::vector<int>& new_shape) const;
+
+    std::vector<int> getShape() const;
+    Device getDevice() const;
+    std::string toString() const;
 };
 
 inline Tensor::Tensor(const NdArray &data, const bool requires_grad): impl(std::make_shared<TensorImpl>(data, requires_grad)) {}

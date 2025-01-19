@@ -21,6 +21,34 @@ NdArray::NdArray(std::vector<int> shape, const Device device): device(device), s
 
 NdArray::NdArray(const NdArray &tensor) : device(tensor.device), shape(tensor.shape), data(tensor.data) {}
 
+NdArray NdArray::zeros_like(const NdArray &nds) {
+    NdArray result(nds.getShape(), Device::CPU);
+
+    for (int i = 0; i < result.size(); i++) {
+        result.data->space[i] = 0.0;
+    }
+
+    if (nds.getDevice() == Device::GPU) {
+        return result.gpu();
+    }
+    return result;
+}
+
+NdArray NdArray::zeros(std::vector<int> shape, Device device) {
+    NdArray result(shape, Device::CPU);
+    for (int i = 0; i < result.size(); i++) {
+        result.data->space[i] = 0.0;
+    }
+
+    switch (device) {
+        case Device::CPU:
+            return result;
+        case Device::GPU:
+            return result.gpu();
+    }
+    return result;
+}
+
 NdArray NdArray::ones(std::vector<int> shape, Device device) {
     NdArray result(shape, Device::CPU);
     for (int i = 0; i < result.size(); i++) {
@@ -64,6 +92,38 @@ NdArray NdArray::uniform(std::vector<int> shape, Device device) {
     }
 }
 
+/* xaiver - Xavier initialization
+ *
+ * @param shape: shape [m, n] of the tensor, only >=2D tensors are supported
+ * @param device: device to store the tensor, only GPU tensors are supported
+ *
+ * @description: the tensor is initialized with random values drawn from a normal distribution with mean 0 and variance 2 / (m + n)
+ *
+ * @return: tensor with Xavier initialization
+ */
+NdArray NdArray::xavier(const std::vector<int> &shape, const Device device) {
+    if (shape.size() < 2) {
+        throw std::runtime_error("Xavier initialization is only supported for >=2D tensors");
+    }
+
+    if (device != Device::GPU) {
+        throw std::runtime_error("Xavier initialization is only supported for GPU tensors");
+    }
+
+    const int m = shape[0];
+    const int n = shape[1];
+    const TensorDataType variance = 2.0f / (m + n);
+
+    // Use curand
+    NdArray result(shape, Device::GPU);
+    curandGenerator_t gen;
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, rand());
+    curandGenerateNormal(gen, result.getRawData(), result.size(), 0.0f, sqrt(variance));
+    curandDestroyGenerator(gen);
+    return result;
+}
+
 NdArray NdArray::from_raw_data(std::vector<int> shape, Device device, TensorDataType *data) {
     NdArray result(shape, device);
     if (device == Device::CPU) {
@@ -79,6 +139,21 @@ NdArray NdArray::from_raw_data(std::vector<int> shape, Device device, TensorData
 NdArray NdArray::view(const std::vector<int> &newShape) const {
     NdArray newTensor(newShape, device);
     newTensor.data = data;
+    return newTensor;
+}
+
+NdArray NdArray::reshape(const std::vector<int> &newShape) const {
+    NdArray newTensor(newShape, device);
+    if (size() != newTensor.size()) throw std::runtime_error("Reshape size mismatch");
+
+    if (device == Device::CPU) {
+        for (int i = 0; i < size(); i++) {
+            newTensor.getRawData()[i] = getRawData()[i];
+        }
+    } else {
+        cudaMemcpy(newTensor.getRawData(), getRawData(), size() * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
+    }
+
     return newTensor;
 }
 
@@ -186,6 +261,23 @@ std::string NdArray::toString() const {
 
 std::vector<int> NdArray::getShape() const {
     return this->shape;
+}
+
+NdArray operator*(TensorDataType scalar, const NdArray &tensor) {
+    NdArray result(tensor.getShape(), tensor.getDevice());
+
+    switch (tensor.getDevice()) {
+        case Device::CPU:
+            for (int i = 0; i < tensor.size(); i++) {
+                result.getRawData()[i] = scalar * tensor.getRawData()[i];
+            }
+            break;
+        case Device::GPU:
+            thrust::transform(thrust::device, tensor.getRawData(), tensor.getRawData() + tensor.size(), result.getRawData(), [scalar] __device__(TensorDataType x) { return scalar * x; });
+            break;
+    }
+
+    return result;
 }
 
 /*

@@ -9,6 +9,10 @@ include_directories(
         ndarray autodiff
 )
 
+set(SOURCES
+        tensor.cu
+)
+
 set(NDARRAY_SOURCES
         ndarray/ndarray.cu
         ndarray/ndarray_kernel.cu
@@ -41,7 +45,7 @@ set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 include_directories(${pybind11_INCLUDE_DIR})
 
-#link_directories(/opt/miniconda3/envs/aiprog/lib) # Align with conda env lib, not system lib
-#pybind11_add_module(Genshin tensor_module.cu ndarray/ndarray.cu)
-#target_link_libraries(Genshin PRIVATE cublas curand)
-#install(TARGETS Genshin DESTINATION .)
+link_directories(/opt/miniconda3/envs/aiprog/lib) # Align with conda env lib, not system lib
+pybind11_add_module(Designant pybind.cu ${SOURCES} ${NDARRAY_SOURCES} ${AUTODIFF_SOURCES} ${UTILS_SOURCES})
+target_link_libraries(Designant PRIVATE cublas curand)
+install(TARGETS Designant DESTINATION .)

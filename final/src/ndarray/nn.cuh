@@ -238,7 +238,7 @@ namespace NdArrayNN {
         return y;
     }
 
-    inline TensorDataType cross_entropy(const NdArray &input, const NdArray &ground_truth) {
+    inline NdArray cross_entropy(const NdArray &input, const NdArray &ground_truth) {
         if (input.getShape().size() != 2 || ground_truth.getShape().size() != 1) {
             throw std::runtime_error("Invalid shape for cross_entropy");
         }
@@ -252,17 +252,20 @@ namespace NdArrayNN {
             throw std::runtime_error("Unimplemented device for cross_entropy");
         }
 
-        TensorDataType *d_output_loss;
-        cudaMalloc(&d_output_loss, sizeof(TensorDataType));
-        cudaMemset(d_output_loss, 0, sizeof(TensorDataType));
+        // TensorDataType *d_output_loss;
+        // cudaMalloc(&d_output_loss, sizeof(TensorDataType));
+        // cudaMemset(d_output_loss, 0, sizeof(TensorDataType));
+        NdArray result({1}, Device::GPU);
 
-        ndarray_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), d_output_loss, N, C);
+        ndarray_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), result.getRawData(), N, C);
 
-        TensorDataType output_loss = 0.0f;
-        cudaMemcpy(&output_loss, d_output_loss, sizeof(TensorDataType), cudaMemcpyDeviceToHost);
-        cudaFree(d_output_loss);
+        // TensorDataType output_loss = 0.0f;
+        // cudaMemcpy(&output_loss, d_output_loss, sizeof(TensorDataType), cudaMemcpyDeviceToHost);
+        // cudaFree(d_output_loss);
+        //
+        // return output_loss;
 
-        return output_loss;
+        return result;
     }
 
     // The `input` argument here is the output of the softmax layer.

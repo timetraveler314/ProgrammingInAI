@@ -13,6 +13,47 @@ namespace Operators {
         // Tensor operator() (std::vector<Tensor> args) const;
     };
 
+    class Reshape final : public TensorOp {
+    public:
+        std::vector<int> new_shape;
+
+        explicit Reshape(std::vector<int> new_shape): new_shape(std::move(new_shape)) {}
+
+        std::string name() const override {
+            return "<Reshape to " + std::to_string(new_shape.size()) + ">";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            auto& x = args[0];
+            return x.reshape(new_shape);
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            return {out_grad.reshape(new_shape)};
+        }
+    };
+
+    class ScalarProduct final : public TensorOp {
+    public:
+        TensorDataType scalar;
+
+        std::string name() const override {
+            return "<ScalarProduct by " + std::to_string(scalar) + ">";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            auto& x = args[0];
+            return scalar * x;
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            return {scalar * out_grad};
+        }
+    };
 
     class ReLU final : public TensorOp {
     public:
@@ -110,6 +151,28 @@ namespace Operators {
         }
     };
 
+    class SoftmaxCrossEntropy final : public TensorOp {
+    public:
+        std::string name() const override {
+            return "SoftmaxCrossEntropy";
+        }
+
+        // Args: input, ground truth
+        NdArray compute(std::vector<NdArray> &args) const override {
+            assert(args.size() == 2);
+            return NdArrayNN::cross_entropy(NdArrayNN::forward_softmax(args[0]), args[1]);
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 2);
+            const NdArray x = args[0]->realize();
+            const NdArray y = args[1]->realize();
+
+            auto dx = NdArrayNN::backward_softmax_cross_entropy(NdArrayNN::forward_softmax(x), y);
+            return {dx, NdArray::zeros_like(y)};
+        }
+    };
+
     /* Non-unary operators */
 
     class EWiseAdd final : public TensorOp {
@@ -149,6 +212,51 @@ namespace Operators {
             auto db = a.transpose() % out_grad;
 
             return {da, db};
+        }
+    };
+
+    class Conv2D final : public TensorOp {
+    public:
+        std::string name() const override {
+            return "Conv2D";
+        }
+
+        // Args: input, kernels
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 2);
+            return NdArrayNN::conv2d_3x3(args[0], args[1]);
+        }
+
+        /* @param out_grad: gradient of the loss wrt the output of the operator
+         * @param args: input, kernels
+         * @return: gradient of the loss wrt the input and the kernels
+         */
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 2);
+            const NdArray x = args[0]->realize();
+            const NdArray kernels = args[1]->realize();
+
+            auto [dx, dkernels] = NdArrayNN::conv2d_3x3_backward(x, kernels, out_grad);
+
+            return {dx, dkernels};
+        }
+    };
+
+    class MaxPool2D final : public TensorOp {
+    public:
+        std::string name() const override {
+            return "MaxPool2D";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            return NdArrayNN::forward_max_pooling_2x2(args[0]);
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            const NdArray x = args[0]->realize();
+            return {NdArrayNN::backward_max_pooling_2x2(out_grad, x)};
         }
     };
 }
