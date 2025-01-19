@@ -335,7 +335,6 @@ NdArray operator+(const NdArray &lhs, const NdArray &rhs) {
         return result;
     } else {
         NdArray result(lhs.getShape(), Device::GPU);
-        std::cout << "Calling ewise_add_kernel_gpu" << std::endl;
         ndarray_kernel::ewise_add_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
 
         return result;
@@ -357,7 +356,6 @@ NdArray operator-(const NdArray &lhs, const NdArray &rhs) {
         return result;
     } else {
         NdArray result(lhs.getShape(), Device::GPU);
-        std::cout << "Calling ewise_minus_kernel_gpu" << std::endl;
         ndarray_kernel::ewise_minus_kernel_gpu<<<CudaGetBlocks(result.size()), kCudaThreadsNum>>>(x.getRawData(), y.getRawData(), result.getRawData(), result.size());
 
         return result;

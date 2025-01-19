@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
+#include <pybind11/operators.h>
 #include "ndarray.h"
 #include "nn.cuh"
 #include "tensor.h"
@@ -97,6 +98,7 @@ PYBIND11_MODULE(Designant, m) {
         .def("__add__", &Tensor::operator+)
         .def("__sub__", static_cast<Tensor (Tensor::*)(const Tensor&) const>(&Tensor::operator-))
         .def("__neg__", static_cast<Tensor (Tensor::*)() const>(&Tensor::operator-))
+        .def(float() * py::self)
         .def("__matmul__", &Tensor::operator%)
         .def("transpose", &Tensor::transpose)
         .def("reshape", &Tensor::reshape)

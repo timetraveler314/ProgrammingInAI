@@ -43,7 +43,7 @@ void compute_gradients(const Tensor &out_tensor, const Tensor &out_grad) {
         }
     }
 
-    std::cout << ss.str() << std::endl;
+    // std::cout << ss.str() << std::endl;
 
     // In reverse topological order
     for (auto it = topological_order.rbegin(); it != topological_order.rend(); ++it) {

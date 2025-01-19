@@ -256,6 +256,7 @@ namespace NdArrayNN {
         // cudaMalloc(&d_output_loss, sizeof(TensorDataType));
         // cudaMemset(d_output_loss, 0, sizeof(TensorDataType));
         NdArray result({1}, Device::GPU);
+        cudaMemset(result.getRawData(), 0, sizeof(TensorDataType));
 
         ndarray_kernel::cross_entropy_kernel_gpu<<<CudaGetBlocks(N), kCudaThreadsNum>>>(x.getRawData(), gt.getRawData(), result.getRawData(), N, C);
 

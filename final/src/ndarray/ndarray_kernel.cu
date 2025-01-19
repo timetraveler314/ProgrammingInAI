@@ -5,6 +5,8 @@
 #include <iostream>
 #include "ndarray_kernel.cuh"
 
+#include "../utils/global_cublas_handle.cuh"
+
 void checkCudaError(const char* msg) {
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError();
@@ -100,11 +102,9 @@ __global__ void ndarray_kernel::ones_kernel(TensorDataType *data, size_t size) {
 
 void ndarray_kernel::forward_fc_kernel_gpu(const TensorDataType *input, const TensorDataType *weight,
     const TensorDataType *bias, TensorDataType *output, size_t batch_size, size_t input_size, size_t output_size) {
-    cublasHandle_t handle;
-    cublasCreate(&handle);
 
     // Compute the matrix multiplication
-    gemm_row_major_gpu(handle, CUBLAS_OP_N, CUBLAS_OP_T,
+    gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_T,
                        batch_size, output_size, input_size,
                        1.0, 0.0,
                        input, weight, output);
@@ -116,31 +116,28 @@ void ndarray_kernel::forward_fc_kernel_gpu(const TensorDataType *input, const Te
     cudaDeviceSynchronize();
 
     // Broadcast the bias
-    gemm_row_major_gpu(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+    gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_N,
                        batch_size, output_size, 1,
                        1.0, 1.0,
                        ones, bias, output);
 
     cudaDeviceSynchronize();
-    cublasDestroy(handle);
     cudaFree(ones);
 }
 
 void ndarray_kernel::backward_fc_kernel_gpu(const TensorDataType *input, const TensorDataType *weight,
     const TensorDataType *output_grad, TensorDataType *input_grad, TensorDataType *weight_grad,
     TensorDataType *bias_grad, size_t batch_size, size_t input_size, size_t output_size) {
-    cublasHandle_t handle;
-    cublasCreate(&handle);
 
     // Compute the input gradient
-    gemm_row_major_gpu(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+    gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_N,
                        batch_size, input_size, output_size,
 
                        1.0, 0.0,
                        output_grad, weight, input_grad);
 
     // Compute the weight gradient
-    gemm_row_major_gpu(handle, CUBLAS_OP_T, CUBLAS_OP_N,
+    gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_T, CUBLAS_OP_N,
                        output_size, input_size, batch_size,
                        1.0, 0.0,
                        output_grad, input, weight_grad);
@@ -150,13 +147,12 @@ void ndarray_kernel::backward_fc_kernel_gpu(const TensorDataType *input, const T
     ones_kernel<<<CudaGetBlocks(batch_size), kCudaThreadsNum>>>(ones, batch_size);
 
     // Compute the bias gradient
-    gemm_row_major_gpu(handle, CUBLAS_OP_T, CUBLAS_OP_N,
+    gemm_row_major_gpu(global_cublas_handle::get_instance(), CUBLAS_OP_T, CUBLAS_OP_N,
                        output_size, 1, batch_size,
                        1.0, 0.0,
                        output_grad, ones, bias_grad);
 
     cudaDeviceSynchronize();
-    cublasDestroy(handle);
     cudaFree(ones);
 }
 
