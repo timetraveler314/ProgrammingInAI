@@ -8,6 +8,7 @@
 #include <iomanip>
 
 #include <functional>
+#include <iostream>
 
 #include "device_space.hpp"
 
@@ -34,6 +35,14 @@ public:
     NdArray& operator=(const NdArray& tensor) = default;
     NdArray& operator=(NdArray&& tensor) = default;
 
+    ~NdArray() {
+        // std::cout << "NdArray destructor called with shape: ";
+        // for (int i = 0; i < shape.size(); i++) {
+        //     std::cout << shape[i] << " ";
+        // }
+        // std::cout << std::endl;
+    }
+
     static NdArray zeros_like(const NdArray & nds);
     static NdArray zeros(std::vector<int> shape, Device device);
     static NdArray ones(std::vector<int> shape, Device device);
@@ -46,10 +55,6 @@ public:
 
     NdArray view(const std::vector<int> &newShape) const;
     NdArray reshape(const std::vector<int> &newShape) const;
-
-    // Nothing needed here. Data pointer will be freed automatically by
-    // the shared_ptr managing DeviceSpace.
-    ~NdArray() = default;
 
     TensorDataType* getRawData() const;
 

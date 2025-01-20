@@ -5,11 +5,15 @@
 #ifndef TENSOR_H
 #define TENSOR_H
 
+#include <map>
+
 #include "autodiff/value.h"
 #include "autodiff/op.h"
 #include "autodiff/operators.h"
 
 // using Tensor = std::shared_ptr<TensorImpl>;
+extern int count;
+extern std::map<std::string, int> categories;
 
 class TensorImpl : public ValueImpl {
     std::optional<NdArray> grad;
@@ -17,16 +21,37 @@ class TensorImpl : public ValueImpl {
 public:
     TensorImpl(const std::vector<int>& shape, Device device, const bool require_grad = false)
         : ValueImpl(NdArray(shape, device), require_grad), grad(NdArray(shape, device)) {
+        count++;
+        categories["<leaf>"]++;
     }
 
     // Create a leaf value with the given data
     explicit TensorImpl(const NdArray& data, const bool require_grad = false)
         : ValueImpl(data, require_grad), grad(NdArray(data.getShape(), data.getDevice())) {
+        count++;
+        categories["<leaf>"]++;
     }
 
     // Create a Tensor from operation (Op) and arguments (Value's)
     TensorImpl(std::unique_ptr<Op> op, const std::vector<Value>& args, const bool require_grad = false)
         : ValueImpl(std::move(op), args, require_grad), grad(std::nullopt) {
+        count++;
+        categories[this->getOp()->name()]++;
+    }
+
+    ~TensorImpl() override {
+        count--;
+        if (this->isLeaf()) {
+            categories["<leaf>"]--;
+        } else {
+            categories[this->getOp()->name()]--;
+        }
+        // if (count) {
+        //     std::cout << "TensorImpl count: " << count << std::endl;
+        //     for (const auto& [key, value] : categories) {
+        //         std::cout << key << ": " << value << std::endl;
+        //     }
+        // }
     }
 
     // static Tensor uniform(const std::vector<int>& shape, const Device device, const bool require_grad = false) {

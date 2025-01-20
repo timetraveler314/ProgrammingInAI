@@ -6,6 +6,11 @@
 
 #include <autodiff.h>
 
+int count = 0;
+std::map<std::string, int> categories;
+
+int device_space_count = 0;
+
 void Tensor::backward() {
     this->to_value()->realize();
 

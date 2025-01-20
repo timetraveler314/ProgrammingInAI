@@ -13,10 +13,29 @@ enum class Device {
     GPU
 };
 
+extern int device_space_count;
+
 struct DeviceSpace {
     Device device;
     TensorDataType* space;
     size_t size;
+
+    DeviceSpace(const DeviceSpace&) = delete;
+    DeviceSpace& operator=(const DeviceSpace&) = delete;
+
+    DeviceSpace(DeviceSpace&& deviceSpace) noexcept : device(deviceSpace.device), space(deviceSpace.space), size(deviceSpace.size) {
+        deviceSpace.space = nullptr;
+    }
+
+    DeviceSpace& operator=(DeviceSpace&& deviceSpace) noexcept {
+        if (this != &deviceSpace) {
+            device = deviceSpace.device;
+            space = deviceSpace.space;
+            size = deviceSpace.size;
+            deviceSpace.space = nullptr;
+        }
+        return *this;
+    }
 
     DeviceSpace(Device device, size_t size) : device(device), space(nullptr), size(size) {
         switch (device) {
@@ -27,19 +46,7 @@ struct DeviceSpace {
                 cudaMalloc(&space, size * sizeof(TensorDataType));
             break;
         }
-    }
-
-    DeviceSpace(const DeviceSpace& deviceSpace) : device(deviceSpace.device), space(nullptr), size(deviceSpace.size) {
-        switch (deviceSpace.device) {
-            case Device::CPU:
-                space = new TensorDataType[size];
-            memcpy(space, deviceSpace.space, size * sizeof(TensorDataType));
-            break;
-            case Device::GPU:
-                cudaMalloc(&space, size * sizeof(TensorDataType));
-            cudaMemcpy(space, deviceSpace.space, size * sizeof(TensorDataType), cudaMemcpyDeviceToDevice);
-            break;
-        }
+        device_space_count += size;
     }
 
     operator TensorDataType*() const {
@@ -47,13 +54,14 @@ struct DeviceSpace {
     }
 
     ~DeviceSpace() {
-        if (space)
-            switch (device) {
-                case Device::CPU:
-                    delete [] space;
+        // std::cout << "DeviceSpace destructor, size: " << device_space_count << std::endl;
+        device_space_count-= size;
+        switch (device) {
+            case Device::CPU:
+                delete [] space;
                 break;
-                case Device::GPU:
-                    cudaFree(space);
+            case Device::GPU:
+                cudaFree(space);
                 break;
             }
     }

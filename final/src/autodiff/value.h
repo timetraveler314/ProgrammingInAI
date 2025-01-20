@@ -11,7 +11,7 @@
 
 #include "op.h"
 
-class ValueImpl : public std::enable_shared_from_this<ValueImpl> {
+class ValueImpl {
     std::shared_ptr<Op> op; // The operator that produced this value (optional, nullptr if this is a leaf)
     std::vector<Value> args; // The arguments to the operator
     bool requires_grad = false; // Whether this value requires gradient computation

@@ -7,6 +7,7 @@
 
 #include "ndarray.h"
 #include "ndarray_kernel.cuh"
+#include "../utils/global_cublas_handle.cuh"
 
 namespace NdArrayNN {
     inline NdArray forward_relu(const NdArray &input) {
@@ -315,9 +316,6 @@ namespace NdArrayNN {
             throw std::runtime_error("Unimplemented device for conv2d_3x3");
         }
 
-        cublasHandle_t handle;
-        cublasCreate(&handle);
-
         NdArray y({N, K, H, W}, Device::GPU);
 
         TensorDataType *col;
@@ -337,7 +335,7 @@ namespace NdArrayNN {
             cudaDeviceSynchronize();
 
             ndarray_kernel::gemm_row_major_gpu(
-                handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_N,
                 K, H * W, C * 9,
                 1.0f, 0.0f,
                 k.getRawData(), col, y.getRawData() + i * K * H * W
@@ -345,7 +343,6 @@ namespace NdArrayNN {
         }
 
         cudaFree(col);
-        cublasDestroy(handle);
 
         return y;
     }
@@ -379,9 +376,6 @@ namespace NdArrayNN {
             throw std::runtime_error("Unimplemented device for conv2d_3x3 backward");
         }
 
-        cublasHandle_t handle;
-        cublasCreate(&handle);
-
         NdArray kernel_grad({K, C, 3, 3}, Device::GPU);
         TensorDataType *col;
         cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
@@ -402,7 +396,7 @@ namespace NdArrayNN {
             cudaDeviceSynchronize();
 
             ndarray_kernel::gemm_row_major_gpu(
-                handle, CUBLAS_OP_N, CUBLAS_OP_T,
+                global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_T,
                 K, C * 9, H * W,
                 1.0f, 1.0f,
                 output_grad.getRawData() + i * K * H * W, col, kernel_grad.getRawData()
@@ -410,6 +404,8 @@ namespace NdArrayNN {
         }
 
         // No need to average the kernel gradients
+
+        cudaFree(col);
 
         // Compute the input gradient
 
@@ -420,7 +416,7 @@ namespace NdArrayNN {
 
         for (int i = 0; i < N; i++) {
             ndarray_kernel::gemm_row_major_gpu(
-                handle, CUBLAS_OP_T, CUBLAS_OP_N,
+                global_cublas_handle::get_instance(), CUBLAS_OP_T, CUBLAS_OP_N,
                 C * 9, H * W, K,
                 1.0f, 0.0f,
                 k.getRawData(), output_grad.getRawData() + i * K * H * W, grad_col
@@ -440,9 +436,7 @@ namespace NdArrayNN {
             cudaDeviceSynchronize();
             CHECK_CUDA_ERROR("col2im_kernel");
         }
-
-        cudaFree(col);
-        cublasDestroy(handle);
+        cudaFree(grad_col);
 
         return {input_grad, kernel_grad};
 }

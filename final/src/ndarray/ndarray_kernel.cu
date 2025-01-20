@@ -92,6 +92,9 @@ void ndarray_kernel::gemm_row_major_gpu(const cublasHandle_t handle, cublasOpera
     //             A, (transa == CUBLAS_OP_N) ? k : m,
     //             &beta_local,
     //             C, n);
+
+    cudaFree(tmp);
+
 }
 
 __global__ void ndarray_kernel::ones_kernel(TensorDataType *data, size_t size) {

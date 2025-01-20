@@ -31,7 +31,7 @@ namespace Operators {
 
         std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
             assert(args.size() == 1);
-            return {out_grad.reshape(new_shape)};
+            return {out_grad.reshape(args[0]->realize().getShape())};
         }
     };
 

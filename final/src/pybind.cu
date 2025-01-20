@@ -115,10 +115,6 @@ PYBIND11_MODULE(Designant, m) {
         .def_readwrite("kernels", &TensorNN::Conv2D::kernels)
         .def("__call__", &TensorNN::Conv2D::operator());
 
-    py::class_<TensorNN::MaxPool2D>(nn, "MaxPool2d")
-        .def(py::init<>())
-        .def("__call__", &TensorNN::MaxPool2D::operator());
-
     py::class_<TensorNN::Linear>(nn, "Linear")
         .def(py::init<int, int, int>(), py::arg("batch_size"), py::arg("in_features"), py::arg("out_features"))
         .def_readonly("batch_size", &TensorNN::Linear::batch_size)
@@ -132,4 +128,5 @@ PYBIND11_MODULE(Designant, m) {
     nn_functional.def("relu", &TensorFunctional::ReLU);
     nn_functional.def("sigmoid", &TensorFunctional::Sigmoid);
     nn_functional.def("softmax_cross_entropy", &TensorFunctional::SoftmaxCrossEntropy);
+    nn_functional.def("maxpool2d", &TensorFunctional::MaxPool2D);
 }

@@ -23,6 +23,11 @@ namespace TensorFunctional {
         return std::make_shared<TensorImpl>(std::make_unique<Operators::Linear>(), args, true);
     }
 
+    inline Tensor MaxPool2D(const Tensor& x) {
+        std::vector<Value> args = {x.getImpl()};
+        return std::make_shared<TensorImpl>(std::make_unique<Operators::MaxPool2D>(), args, true);
+    }
+
     inline Tensor SoftmaxCrossEntropy(const Tensor& x, const Tensor& y) {
         std::vector<Value> args = {x.getImpl(), y.getImpl()};
         return std::make_shared<TensorImpl>(std::make_unique<Operators::SoftmaxCrossEntropy>(), args, true);
@@ -58,16 +63,6 @@ namespace TensorNN {
         Tensor operator() (const Tensor& x) const {
             std::vector<Value> args = {x.getImpl(), kernels.getImpl()};
             return std::make_shared<TensorImpl>(std::make_unique<Operators::Conv2D>(), args, true);
-        }
-    };
-
-    class MaxPool2D {
-    public:
-        MaxPool2D() {}
-
-        Tensor operator() (const Tensor& x) const {
-            std::vector<Value> args = {x.getImpl()};
-            return std::make_shared<TensorImpl>(std::make_unique<Operators::MaxPool2D>(), args, true);
         }
     };
 }
