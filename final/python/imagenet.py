@@ -1,55 +1,59 @@
 from Designant import * #
 import torch
+from datasets import load_dataset
 from torchvision import datasets
 from torchvision.transforms import v2
 from tqdm import tqdm
 
-new_mirror = 'https://ossci-datasets.s3.amazonaws.com/mnist'
-datasets.MNIST.resources = [
-    ('/'.join([new_mirror, url.split('/')[-1]]), md5)
-    for url, md5 in datasets.MNIST.resources
-]
+class TinyImageNet:
+    def __init__(self):
+        self.ds = load_dataset("zh-plus/tiny-imagenet")
+        self.train_ds = self.ds["train"]
+        self.train_ds.set_format("torch", columns=["image", "label"])
+        self.normalize = v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-def load_mnist(batch_size):
-    from torchvision import datasets, transforms
-    transform = transforms.Compose([
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=[0], std=[1])])
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    def __len__(self):
+        return len(self.train_ds)
 
-    print("MNIST Loaded, with {} training samples and {} testing samples".format(len(train_dataset), len(test_dataset)))
+    def __getitem__(self, idx):
+        image = self.train_ds[idx]["image"] / 255.0
+        label = self.train_ds[idx]["label"]
+
+        # Handle grayscale images
+        if image.shape[0] == 1:
+            image = torch.cat([image, image, image], dim=0)
+
+        image = self.normalize(image)
+        return image, label
+
+class TinyImageNetValidation:
+    def __init__(self):
+        self.ds = load_dataset("zh-plus/tiny-imagenet")
+        self.val_ds = self.ds["valid"]
+        self.val_ds.set_format("torch", columns=["image", "label"])
+        self.normalize = v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+
+    def __len__(self):
+        return len(self.val_ds)
+
+    def __getitem__(self, idx):
+        image = self.val_ds[idx]["image"] / 255.0
+        label = self.val_ds[idx]["label"]
+
+        # Handle grayscale images
+        if image.shape[0] == 1:
+            image = torch.cat([image, image, image], dim=0)
+
+        image = self.normalize(image)
+        return image, label
+
+def load_imagenet(batchsize):
+    train_dataset = TinyImageNet()
+    test_dataset = TinyImageNetValidation()
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batchsize, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batchsize, shuffle=False)
 
     return train_dataset, train_loader, test_dataset, test_loader
-
-class SimpleNet:
-    def __init__(self, input_size, hidden_size, output_size, batch_size):
-        # 初始化两层线性网络
-        self.fc1 = nnn.Linear(batch_size, input_size, hidden_size)
-        self.fc2 = nnn.Linear(batch_size, hidden_size, output_size)
-
-        self.params = [self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias]
-
-    def forward(self, x):
-        # 前向传播
-        x = x.reshape([x.shape()[0], x.shape()[1] * x.shape()[2] * x.shape()[3]])
-        z1 = self.fc1(x)  # 第一个线性层
-        a1 = nnn.functional.relu(z1)  # ReLU 激活
-        z2 = self.fc2(a1)  # 第二个线性层
-        return z2
-
-    def loss(self, predictions, targets):
-        # 计算Softmax交叉熵损失
-        return nnn.functional.softmax_cross_entropy(predictions, targets)
-
-    def accuracy(self, predictions, targets):
-        # 计算准确率
-        predicted = predictions.numpy().argmax(axis=1)
-        correct = (predicted == targets.numpy()).sum()
-        return correct / targets.shape()[0]
 
 
 class ConvNet:
@@ -88,6 +92,43 @@ class ConvNet:
         correct = (predicted == targets.numpy()).sum()
         return correct / targets.shape()[0]
 
+class MyLeNet:
+    def __init__(self, batch_size):
+        k1 = 64
+        k2 = 128
+        k3 = 256
+        hidden_size = 1024
+        self.conv1 = nnn.Conv2d_3x3(3, k1)
+        self.conv2 = nnn.Conv2d_3x3(k1, k2)
+        self.conv3 = nnn.Conv2d(k2, k3, 7, 2, 3)
+        self.fc1 = nnn.Linear(batch_size, k3 * 8 * 8, hidden_size)
+        self.fc2 = nnn.Linear(batch_size, hidden_size, 200)
+
+        self.params = [self.conv1.kernels, self.conv2.kernels, self.conv3.kernels, self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias]
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = nnn.functional.sigmoid(x)
+        x = nnn.functional.maxpool2d(x)
+        x = self.conv2(x)
+        x = nnn.functional.sigmoid(x)
+        x = nnn.functional.maxpool2d(x)
+        # shape: [128, 16, 14, 14]
+        x = self.conv3(x)
+        x = nnn.functional.sigmoid(x)
+        x = x.reshape([x.shape()[0], x.shape()[1] * x.shape()[2] * x.shape()[3]])
+        x = self.fc1(x)
+        x = nnn.functional.sigmoid(x)
+        x = self.fc2(x)
+        return x
+
+    def loss(self, predictions, targets):
+        return nnn.functional.softmax_cross_entropy(predictions, targets)
+
+    def accuracy(self, predictions, targets):
+        predicted = predictions.numpy().argmax(axis=1)
+        correct = (predicted == targets.numpy()).sum()
+        return correct / targets.shape()[0]
 
 class SGD:
     def __init__(self, params, lr):
@@ -99,11 +140,7 @@ class SGD:
             param.update(param - self.lr * param.grad())
 
 
-def train_mnist():
-    # 数据参数
-    input_size = 28 * 28  # MNIST图像大小
-    hidden_size = 128  # 隐藏层单元数
-    output_size = 10  # MNIST类别数
+def train_imagenet():
     batch_size = 128  # 每次训练的样本数
 
     # 优化器参数
@@ -111,11 +148,9 @@ def train_mnist():
     epochs = 10
 
     # 加载MNIST数据
-    train_dataset, train_loader, test_dataset, test_loader = load_mnist(batch_size)
+    train_dataset, train_loader, test_dataset, test_loader = load_imagenet(batch_size)
 
-    # Network
-    #net = SimpleNet(input_size, hidden_size, output_size, batch_size)
-    net = ConvNet(batch_size)
+    net = MyLeNet(batch_size)
     optimizer = SGD(net.params, lr)
 
     # 训练
@@ -162,4 +197,4 @@ def train_mnist():
 
 
 if __name__ == "__main__":
-    train_mnist()
+    train_imagenet()

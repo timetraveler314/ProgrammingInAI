@@ -217,16 +217,16 @@ namespace Operators {
         }
     };
 
-    class Conv2D final : public TensorOp {
+    class Conv2D_3x3 final : public TensorOp {
     public:
         std::string name() const override {
-            return "Conv2D";
+            return "Conv2D_3x3";
         }
 
         // Args: input, kernels
         NdArray compute(std::vector<NdArray>& args) const override {
             assert(args.size() == 2);
-            return NdArrayNN::conv2d_3x3(args[0], args[1]);
+            return NdArrayNN::conv2d(3, 1, 1, args[0], args[1]);
         }
 
         /* @param out_grad: gradient of the loss wrt the output of the operator
@@ -238,7 +238,38 @@ namespace Operators {
             const NdArray x = args[0]->realize();
             const NdArray kernels = args[1]->realize();
 
-            auto [dx, dkernels] = NdArrayNN::conv2d_3x3_backward(x, kernels, out_grad);
+            auto [dx, dkernels] = NdArrayNN::conv2d_backward(3, 1, 1, x, kernels, out_grad);
+
+            return {dx, dkernels};
+        }
+    };
+
+    class Conv2D final : public TensorOp {
+    public:
+        const int kernel_size, stride, padding;
+
+        Conv2D(const int kernel_size, const int stride, const int padding): kernel_size(kernel_size), stride(stride), padding(padding) {}
+
+        std::string name() const override {
+            return "Conv2D_Any";
+        }
+
+        // Args: input, kernels
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 2);
+            return NdArrayNN::conv2d(kernel_size, stride, padding, args[0], args[1]);
+        }
+
+        /* @param out_grad: gradient of the loss wrt the output of the operator
+         * @param args: input, kernels
+         * @return: gradient of the loss wrt the input and the kernels
+         */
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 2);
+            const NdArray x = args[0]->realize();
+            const NdArray kernels = args[1]->realize();
+
+            auto [dx, dkernels] = NdArrayNN::conv2d_backward(kernel_size, stride, padding, x, kernels, out_grad);
 
             return {dx, dkernels};
         }

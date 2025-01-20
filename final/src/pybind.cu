@@ -64,8 +64,8 @@ PYBIND11_MODULE(Designant, m) {
     ndarr_nn.def("backward_sigmoid", &NdArrayNN::backward_sigmoid);
     ndarr_nn.def("forward_fc", &NdArrayNN::forward_fc);
     ndarr_nn.def("backward_fc", &NdArrayNN::backward_fc);
-    ndarr_nn.def("conv2d_3x3", &NdArrayNN::conv2d_3x3);
-    ndarr_nn.def("conv2d_3x3_backward", &NdArrayNN::conv2d_3x3_backward);
+    // ndarr_nn.def("conv2d_3x3", &NdArrayNN::conv2d3, 1, 1>);
+    // ndarr_nn.def("conv2d_3x3_backward", &NdArrayNN::conv2d_backward<3, 1, 1>);
     ndarr_nn.def("forward_max_pooling_2x2", &NdArrayNN::forward_max_pooling_2x2);
     ndarr_nn.def("backward_max_pooling_2x2", &NdArrayNN::backward_max_pooling_2x2);
     ndarr_nn.def("forward_softmax", &NdArrayNN::forward_softmax);
@@ -108,8 +108,16 @@ PYBIND11_MODULE(Designant, m) {
         .def("update", &Tensor::update);
 
     py::module nn = m.def_submodule("nnn");
-    py::class_<TensorNN::Conv2D>(nn, "Conv2d")
+    py::class_<TensorNN::Conv2D_3x3>(nn, "Conv2d_3x3")
         .def(py::init<int, int>(), py::arg("in_channels"), py::arg("out_channels"))
+        .def_readonly("in_channels", &TensorNN::Conv2D_3x3::C)
+        .def_readonly("out_channels", &TensorNN::Conv2D_3x3::K)
+        .def_readwrite("kernels", &TensorNN::Conv2D_3x3::kernels)
+        .def("__call__", &TensorNN::Conv2D_3x3::operator());
+
+    py::class_<TensorNN::Conv2D>(nn, "Conv2d")
+        .def(py::init<int, int, int, int, int>(), py::arg("in_channels"), py::arg("out_channels"),
+            py::arg("kernel_size"), py::arg("stride"), py::arg("padding"))
         .def_readonly("in_channels", &TensorNN::Conv2D::C)
         .def_readonly("out_channels", &TensorNN::Conv2D::K)
         .def_readwrite("kernels", &TensorNN::Conv2D::kernels)

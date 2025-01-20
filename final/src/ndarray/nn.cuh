@@ -5,6 +5,8 @@
 #ifndef NDARRAYNN_CUH
 #define NDARRAYNN_CUH
 
+#include <nn.cuh>
+
 #include "ndarray.h"
 #include "ndarray_kernel.cuh"
 #include "../utils/global_cublas_handle.cuh"
@@ -291,7 +293,7 @@ namespace NdArrayNN {
         return dx;
     }
 
-    inline NdArray conv2d_3x3(const NdArray &images, const NdArray &kernels) {
+    inline NdArray conv2d(const int kernel_size, const int stride, const int padding, const NdArray &images, const NdArray &kernels) {
         if (images.getShape().size() != 4 || kernels.getShape().size() != 4) {
             throw std::runtime_error("Invalid shape for conv2d_3x3");
         }
@@ -306,39 +308,41 @@ namespace NdArrayNN {
         const int K_H = kernels.getShape()[2];
         const int K_W = kernels.getShape()[3];
 
-        if (K_C != C || K_H != 3 || K_W != 3) {
-            throw std::runtime_error("Invalid shape for conv2d_3x3");
+        if (K_C != C || K_H != kernel_size || K_W != kernel_size) {
+            throw std::runtime_error("Invalid shape for conv2d_" + std::to_string(kernel_size) + "x" + std::to_string(kernel_size));
         }
 
         auto [device, im, k] = NdArray::unifyDevice(images, kernels);
 
         if (device != Device::GPU) {
-            throw std::runtime_error("Unimplemented device for conv2d_3x3");
+            throw std::runtime_error("Unimplemented device for conv2d");
         }
 
-        NdArray y({N, K, H, W}, Device::GPU);
+        int H_out = (H + 2 * padding - kernel_size) / stride + 1;
+        int W_out = (W + 2 * padding - kernel_size) / stride + 1;
+        NdArray y({N, K, H_out, W_out}, Device::GPU);
 
         TensorDataType *col;
-        cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
+        cudaMalloc(&col, C * kernel_size * kernel_size * H_out * W_out * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
             ndarray_kernel::im2col_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 im.getRawData() + i * C * H * W, // Current image
                 col,
                 C, H, W, // image C, H, W
-                3, 3, // kernel size
-                1, 1, // padding
-                1, 1, // stride
-                H, W // col H, W
+                kernel_size, kernel_size, // kernel size
+                padding, padding, // padding
+                stride, stride, // stride
+                H_out, W_out // col H, W
             );
 
             cudaDeviceSynchronize();
 
             ndarray_kernel::gemm_row_major_gpu(
                 global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_N,
-                K, H * W, C * 9,
+                K, H_out * W_out, C * kernel_size * kernel_size,
                 1.0f, 0.0f,
-                k.getRawData(), col, y.getRawData() + i * K * H * W
+                k.getRawData(), col, y.getRawData() + i * K * H_out * W_out
             );
         }
 
@@ -347,9 +351,9 @@ namespace NdArrayNN {
         return y;
     }
 
-    inline std::tuple<NdArray, NdArray> conv2d_3x3_backward(const NdArray& images, const NdArray& kernels, const NdArray& output_grad) {
+    inline auto conv2d_backward(const int kernel_size, const int stride, const int padding, const NdArray& images, const NdArray& kernels, const NdArray& output_grad) {
         if (images.getShape().size() != 4 || kernels.getShape().size() != 4 || output_grad.getShape().size() != 4) {
-            throw std::runtime_error("Invalid shape for conv2d_3x3 backward");
+            throw std::runtime_error("Invalid shape for conv2d backward");
         }
 
         const int N = images.getShape()[0];
@@ -362,23 +366,26 @@ namespace NdArrayNN {
         const int K_H = kernels.getShape()[2];
         const int K_W = kernels.getShape()[3];
 
-        if (K_C != C || K_H != 3 || K_W != 3) {
-            throw std::runtime_error("Invalid shape for conv2d_3x3 backward");
+        if (K_C != C || K_H != kernel_size || K_W != kernel_size) {
+            throw std::runtime_error("Invalid shape for conv2d_" + std::to_string(kernel_size) + "x" + std::to_string(kernel_size) + " backward");
         }
 
-        if (output_grad.getShape()[0] != N || output_grad.getShape()[1] != K || output_grad.getShape()[2] != H || output_grad.getShape()[3] != W) {
+        int H_out = (H + 2 * padding - kernel_size) / stride + 1;
+        int W_out = (W + 2 * padding - kernel_size) / stride + 1;
+
+        if (output_grad.getShape()[0] != N || output_grad.getShape()[1] != K || output_grad.getShape()[2] != H_out || output_grad.getShape()[3] != W_out) {
             throw std::runtime_error("Output gradient shape does not match expected dimensions");
         }
 
         auto [device, im, k] = NdArray::unifyDevice(images, kernels);
 
         if (device != Device::GPU) {
-            throw std::runtime_error("Unimplemented device for conv2d_3x3 backward");
+            throw std::runtime_error("Unimplemented device for conv2d backward");
         }
 
-        NdArray kernel_grad({K, C, 3, 3}, Device::GPU);
+        NdArray kernel_grad({K, C, kernel_size, kernel_size}, Device::GPU);
         TensorDataType *col;
-        cudaMalloc(&col, C * 9 * H * W * sizeof(TensorDataType));
+        cudaMalloc(&col, C * kernel_size * kernel_size * H_out * W_out * sizeof(TensorDataType));
 
         cudaMemset(kernel_grad.getRawData(), 0, kernel_grad.size() * sizeof(TensorDataType));
 
@@ -387,19 +394,19 @@ namespace NdArrayNN {
                 im.getRawData() + i * C * H * W, // Current image
                 col,
                 C, H, W, // image C, H, W
-                3, 3, // kernel size
-                1, 1, // padding
-                1, 1, // stride
-                H, W // col H, W
+                kernel_size, kernel_size, // kernel size
+                padding, padding, // padding
+                stride, stride, // stride
+                H_out, W_out // col H, W
             );
 
             cudaDeviceSynchronize();
 
             ndarray_kernel::gemm_row_major_gpu(
                 global_cublas_handle::get_instance(), CUBLAS_OP_N, CUBLAS_OP_T,
-                K, C * 9, H * W,
+                K, C * kernel_size * kernel_size, H_out * W_out,
                 1.0f, 1.0f,
-                output_grad.getRawData() + i * K * H * W, col, kernel_grad.getRawData()
+                output_grad.getRawData() + i * K * H_out * W_out, col, kernel_grad.getRawData()
             );
         }
 
@@ -412,14 +419,14 @@ namespace NdArrayNN {
         NdArray input_grad({N, C, H, W}, Device::GPU);
 
         TensorDataType *grad_col;
-        cudaMalloc(&grad_col, C * 9 * H * W * sizeof(TensorDataType));
+        cudaMalloc(&grad_col, C * kernel_size * kernel_size * H * W * sizeof(TensorDataType));
 
         for (int i = 0; i < N; i++) {
             ndarray_kernel::gemm_row_major_gpu(
                 global_cublas_handle::get_instance(), CUBLAS_OP_T, CUBLAS_OP_N,
-                C * 9, H * W, K,
+                C * kernel_size * kernel_size, H_out * W_out, K,
                 1.0f, 0.0f,
-                k.getRawData(), output_grad.getRawData() + i * K * H * W, grad_col
+                k.getRawData(), output_grad.getRawData() + i * K * H_out * W_out, grad_col
             );
             cudaDeviceSynchronize();
             CHECK_CUDA_ERROR(("gemm_row_major_gpu" + std::to_string(i)).c_str());
@@ -427,10 +434,10 @@ namespace NdArrayNN {
             ndarray_kernel::col2im_kernel<<<CudaGetBlocks(C * H * W), kCudaThreadsNum>>>(
                 grad_col,
                 input_grad.getRawData() + i * C * H * W,
-                C, H, W,
-                3, 3,
-                1, 1,
-                1, 1,
+                C, H_out, W_out,
+                kernel_size, kernel_size,
+                padding, padding,
+                stride, stride,
                 H, W
             );
             cudaDeviceSynchronize();
@@ -438,9 +445,8 @@ namespace NdArrayNN {
         }
         cudaFree(grad_col);
 
-        return {input_grad, kernel_grad};
-}
-
+        return std::tuple{input_grad, kernel_grad};
+    }
 }
 
 #endif //NDARRAYNN_CUH

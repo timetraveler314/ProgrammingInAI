@@ -51,18 +51,34 @@ namespace TensorNN {
         }
     };
 
-    class Conv2D {
+    class Conv2D_3x3 {
     public:
         const int C, K;
         Tensor kernels;
 
-        Conv2D(int C, int K): C(C), K(K), kernels(nullptr) {
+        Conv2D_3x3(int C, int K): C(C), K(K), kernels(nullptr) {
             kernels = Tensor(NdArray::xavier({K, C, 3, 3}, Device::GPU), true);
         }
 
         Tensor operator() (const Tensor& x) const {
             std::vector<Value> args = {x.getImpl(), kernels.getImpl()};
-            return std::make_shared<TensorImpl>(std::make_unique<Operators::Conv2D>(), args, true);
+            return std::make_shared<TensorImpl>(std::make_unique<Operators::Conv2D_3x3>(), args, true);
+        }
+    };
+
+    class Conv2D {
+    public:
+        const int C, K;
+        const int kernel_size, stride, padding;
+        Tensor kernels;
+
+        Conv2D(int C, int K, int kernel_size, int stride, int padding): C(C), K(K), kernel_size(kernel_size), stride(stride), padding(padding), kernels(nullptr) {
+            kernels = Tensor(NdArray::xavier({K, C, kernel_size, kernel_size}, Device::GPU), true);
+        }
+
+        Tensor operator() (const Tensor& x) const {
+            std::vector<Value> args = {x.getImpl(), kernels.getImpl()};
+            return std::make_shared<TensorImpl>(std::make_unique<Operators::Conv2D>(kernel_size, stride, padding), args, true);
         }
     };
 }
