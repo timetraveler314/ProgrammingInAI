@@ -11,6 +11,11 @@
 #include "ndarray_kernel.cuh"
 #include "../utils/global_cublas_handle.cuh"
 
+/* NdArrayNN
+ * This namespace contains the forward and backward functions for the neural network layers.
+ * The forward functions take the input tensor and return the output tensor.
+ * The backward functions take the input tensor and the gradient tensor and return a tuple of gradient tensors.
+ */
 namespace NdArrayNN {
     inline NdArray forward_relu(const NdArray &input) {
         // No shape check needed

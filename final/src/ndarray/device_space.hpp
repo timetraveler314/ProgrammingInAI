@@ -15,6 +15,9 @@ enum class Device {
 
 extern int device_space_count;
 
+/* DeviceSpace - a wrapper around a pointer to a memory space on a device
+ * that automatically deallocates the memory when the object goes out of scope
+ */
 struct DeviceSpace {
     Device device;
     TensorDataType* space;
@@ -67,6 +70,11 @@ struct DeviceSpace {
     }
 };
 
+/* device_ptr - a shared pointer to a DeviceSpace object, i.e. an RC model
+ * that provides a copy_to method to copy the data to a different device
+ *
+ * this is introduced to simplify the grammar of the NdArray class
+ */
 class device_ptr : public std::shared_ptr<DeviceSpace> {
 
 public:

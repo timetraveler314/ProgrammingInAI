@@ -32,10 +32,23 @@ namespace ndarray_kernel {
 
     __global__ void ewise_minus_kernel_gpu(const TensorDataType* a, const TensorDataType* b, TensorDataType* c, size_t size);
 
+    /* gemm_row_major_gpu
+     * Perform matrix multiplication C = alpha * A * B + beta * C
+     * A, B, C are row-major matrices
+     * A: m x k
+     * B: k x n
+     * C: m x n
+     *
+     * This function is created because cuBLAS uses column-major matrices
+     * while our tensors are row-major. So `Sgeam`'s are used to transpose
+     */
     void gemm_row_major_gpu(const cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
                                    const int m, const int n, const int k, const TensorDataType alpha, const TensorDataType beta,
                                    const TensorDataType* A, const TensorDataType* B, TensorDataType* C);
 
+    /* ones_kernel
+     * Fill the tensor with ones
+     */
     __global__ void ones_kernel(TensorDataType* data, size_t size);
 
     // Computes the forward pass of a fully connected layer using cuBLAS gemm.
@@ -67,6 +80,7 @@ namespace ndarray_kernel {
         TensorDataType* input_grad, TensorDataType* weight_grad, TensorDataType* bias_grad,
         size_t batch_size, size_t input_size, size_t output_size);
 
+    /* The kernels for neural network layers */
     void forward_softmax_kernel_gpu(TensorDataType *input, TensorDataType *output, size_t batch_size, size_t num_classes);
 
     __global__ void cross_entropy_kernel_gpu(TensorDataType *input, TensorDataType *target, TensorDataType * output_loss, size_t batch_size, size_t num_classes);
@@ -77,6 +91,9 @@ namespace ndarray_kernel {
 
     __global__ void backward_max_pooling_2x2_kernel_gpu(const TensorDataType *upstream_grad, const TensorDataType *input, TensorDataType *output_grad, size_t num_channels, size_t height, size_t width);
 
+    /* im2col - Image to column matrix
+     *
+     * @param out_h: height of the output matrix, usually (H - kernel_h + 2 * pad_h) / stride_h + 1 */
     __global__ void im2col_kernel(const float* input, float* output,
                                   int C, int H, int W,
                                   int kernel_h, int kernel_w,
@@ -84,6 +101,7 @@ namespace ndarray_kernel {
                                   int stride_h, int stride_w,
                                   int out_h, int out_w);
 
+    /* col2im - Column matrix back to image, adding the values that correspond to the same pixel */
     __global__ void col2im_kernel(const float* col, float* im,
                                   int C, int H, int W,
                                   int kernel_h, int kernel_w,
@@ -91,6 +109,11 @@ namespace ndarray_kernel {
                                   int stride_h, int stride_w,
                                   int out_h, int out_w);
 
+    /* average_dim_1_kernel
+     * Compute the average of the input tensor along the dimension 1
+     * The input tensor has shape [N, D]
+     * The output tensor has shape [N]
+     */
     __global__ void average_dim_1_kernel(const float* input, float* output, int N, int D);
 };
 

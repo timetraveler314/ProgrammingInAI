@@ -11,7 +11,6 @@
 #include "autodiff/op.h"
 #include "autodiff/operators.h"
 
-// using Tensor = std::shared_ptr<TensorImpl>;
 extern int count;
 extern std::map<std::string, int> categories;
 
@@ -46,17 +45,7 @@ public:
         } else {
             categories[this->getOp()->name()]--;
         }
-        // if (count) {
-        //     std::cout << "TensorImpl count: " << count << std::endl;
-        //     for (const auto& [key, value] : categories) {
-        //         std::cout << key << ": " << value << std::endl;
-        //     }
-        // }
     }
-
-    // static Tensor uniform(const std::vector<int>& shape, const Device device, const bool require_grad = false) {
-    //     return std::make_shared<TensorImpl>(NdArray::uniform(shape, device), require_grad);
-    // }
 
     friend class Tensor;
 };

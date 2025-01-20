@@ -6,6 +6,11 @@
 #include <map>
 #include "autodiff.h"
 
+/* find_topological_order
+ * Find the topological order of the computation graph
+ * @param values: a list of values in the computation graph
+ * @return: a list of values in the topological order
+ */
 static std::vector<Value> find_topological_order(const std::vector<Value> &values) {
     std::set<Value> visited;
     std::vector<Value> order;

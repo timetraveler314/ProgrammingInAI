@@ -1,3 +1,8 @@
+/* ndarray_module.cu
+ * This is the original file from homework 3.
+ * This is now deprecated, only for trying out python tests in the original homework 3.
+ */
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>

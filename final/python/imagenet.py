@@ -55,43 +55,6 @@ def load_imagenet(batchsize):
 
     return train_dataset, train_loader, test_dataset, test_loader
 
-
-class ConvNet:
-    # Structure: Conv(k1) -> ReLU -> MaxPool -> Conv(k2) -> ReLU -> MaxPool -> Reshape -> Linear -> ReLU -> Linear
-    def __init__(self, N):
-        k1 = 64
-        k2 = 64
-        self.conv1 = nnn.Conv2d_3x3(1, k1)
-        self.conv2 = nnn.Conv2d_3x3(k1, k2)
-        self.fc1 = nnn.Linear(N, 7 * 7 * k2, 128)
-        self.fc2 = nnn.Linear(N, 128, 10)
-
-        self.params = [self.conv1.kernels, self.conv2.kernels, self.fc1.weight,
-                       self.fc1.bias, self.fc2.weight, self.fc2.bias]
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = nnn.functional.relu(x)
-        x = nnn.functional.maxpool2d(x)
-        x = self.conv2(x)
-        x = nnn.functional.relu(x)
-        x = nnn.functional.maxpool2d(x)
-        x = x.reshape([x.shape()[0], x.shape()[1] * x.shape()[2] * x.shape()[3]])
-        x = self.fc1(x)
-        x = nnn.functional.relu(x)
-        x = self.fc2(x)
-        return x
-
-    def loss(self, predictions, targets):
-        # 计算Softmax交叉熵损失
-        return nnn.functional.softmax_cross_entropy(predictions, targets)
-
-    def accuracy(self, predictions, targets):
-        # 计算准确率
-        predicted = predictions.numpy().argmax(axis=1)
-        correct = (predicted == targets.numpy()).sum()
-        return correct / targets.shape()[0]
-
 class MyLeNet:
     def __init__(self, batch_size):
         k1 = 64
@@ -139,19 +102,45 @@ class SGD:
         for param in self.params:
             param.update(param - self.lr * param.grad())
 
+class Adam:
+    def __init__(self, params, lr, beta1=0.9, beta2=0.999, eps=1e-8):
+        self.params = params
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+
+        self.m = [Tensor.zeros_like(param, False) for param in params]
+        self.v = [Tensor.zeros_like(param, False) for param in params]
+        self.t = 0
+
+    def step(self):
+        self.t += 1
+        for i, param in enumerate(self.params):
+            # detach() prevents computation graph from being built
+            # if we don't detach, the computation graph will be built
+            # and all the intermediate values will be stored in memory
+            self.m[i] = (self.beta1 * self.m[i] + (1 - self.beta1) * param.grad()).detach()
+            self.v[i] = (self.beta2 * self.v[i] + (1 - self.beta2) * param.grad() ** 2.0).detach()
+
+            m_hat = self.m[i] / (1 - self.beta1 ** self.t)
+            v_hat = self.v[i] / (1 - self.beta2 ** self.t)
+
+            param.update(param - self.lr * m_hat / ((v_hat ** 0.5) + self.eps))
+
 
 def train_imagenet():
     batch_size = 128  # 每次训练的样本数
 
     # 优化器参数
-    lr = 0.1
-    epochs = 10
+    lr = 0.001
+    epochs = 100
 
     # 加载MNIST数据
     train_dataset, train_loader, test_dataset, test_loader = load_imagenet(batch_size)
 
     net = MyLeNet(batch_size)
-    optimizer = SGD(net.params, lr)
+    optimizer = SGD(net.params, 0.1)
 
     # 训练
     for epoch in range(epochs):

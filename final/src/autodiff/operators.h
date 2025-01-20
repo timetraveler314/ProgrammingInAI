@@ -8,10 +8,14 @@
 #include <cassert>
 #include "../ndarray/nn.cuh"
 
+/* Operators namespace
+ * all operators inherit from the Op class,
+ * and implement the compute and gradient methods
+ *
+ * Some operators have additional fields for recording parameters
+ */
 namespace Operators {
-    class TensorOp : public Op {
-        // Tensor operator() (std::vector<Tensor> args) const;
-    };
+    class TensorOp : public Op {};
 
     class Reshape final : public TensorOp {
     public:

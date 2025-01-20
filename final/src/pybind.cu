@@ -9,6 +9,7 @@
 
 namespace py = pybind11;
 
+/* Convert NdArray to numpy array */
 py::array_t<float> numpy(const NdArray &t) {
     py::array_t<float> np(t.getShape());
     float *np_data = np.mutable_data();
@@ -18,6 +19,7 @@ py::array_t<float> numpy(const NdArray &t) {
     return np;
 }
 
+/* Convert numpy array to NdArray */
 NdArray from_numpy(py::array_t<float, py::array::c_style | py::array::forcecast> np) {
     std::vector<int> shape(np.shape(), np.shape() + np.ndim());
     // By default, we put the tensor on the GPU
@@ -28,6 +30,7 @@ NdArray from_numpy(py::array_t<float, py::array::c_style | py::array::forcecast>
     return t;
 }
 
+/* Designant module - Python bindings */
 PYBIND11_MODULE(Designant, m) {
     py::enum_<Device>(m, "Device")
         .value("CPU", Device::CPU)

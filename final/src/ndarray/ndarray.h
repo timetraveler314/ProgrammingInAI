@@ -12,11 +12,22 @@
 
 #include "device_space.hpp"
 
+/* NdArray - a class representing a multi-dimensional array
+ * that is used for data computation in the neural network
+ *
+ * this is the original Tensor in homework 3, and is now renamed to NdArray
+ *
+ * Philosophy:
+ * - The NdArray class is designed to be pythonic,
+ *   i.e. it is a `reference` to the data, not the data itself
+ *   (so `shared_ptr` is used and shallow copy is the default)
+ */
 class NdArray {
     Device device;
     std::vector<int> shape;
     device_ptr data;
 
+    /* useful template functions to unify the device of multiple tensors */
     template <typename First, typename... Rest>
     static auto unifyToGpu(const First& first, const Rest&... rest) {
         auto firstGpu = first.device == Device::GPU ? first : first.gpu();
@@ -35,19 +46,13 @@ public:
     NdArray& operator=(const NdArray& tensor) = default;
     NdArray& operator=(NdArray&& tensor) = default;
 
-    ~NdArray() {
-        // std::cout << "NdArray destructor called with shape: ";
-        // for (int i = 0; i < shape.size(); i++) {
-        //     std::cout << shape[i] << " ";
-        // }
-        // std::cout << std::endl;
-    }
-
+    /* static initializers */
     static NdArray zeros_like(const NdArray & nds);
     static NdArray zeros(std::vector<int> shape, Device device);
     static NdArray ones(std::vector<int> shape, Device device);
     static NdArray iota(std::vector<int> shape, Device device);
     static NdArray uniform(std::vector<int> shape, Device device);
+    /* xavier - return a tensor initialized with Xavier initialization */
     static NdArray xavier(const std::vector<int> &shape, Device device);
     static NdArray from_raw_data(std::vector<int> shape, Device device, TensorDataType* data);
 
@@ -58,7 +63,9 @@ public:
 
     TensorDataType* getRawData() const;
 
+    /* cpu - return a copy of the tensor on the CPU */
     NdArray cpu() const;
+    /* gpu - return a copy of the tensor on the GPU */
     NdArray gpu() const;
 
     Device getDevice() const;
@@ -71,8 +78,10 @@ public:
         else return std::make_tuple(Device::CPU, tensors...);
     }
 
+    /* size - return the number of elements in the tensor */
     int size() const;
 
+    /* operators */
     NdArray operator+(TensorDataType scalar) const;
     friend NdArray operator+(const NdArray& lhs, const NdArray& rhs);
     friend NdArray operator-(const NdArray& lhs, const NdArray& rhs);

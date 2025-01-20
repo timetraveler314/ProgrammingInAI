@@ -12,7 +12,6 @@ void checkCudaError(const char* msg) {
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         std::cerr << "CUDA error after " << msg << ": " << cudaGetErrorString(err) << std::endl;
-        // throw std::runtime_error("CUDA error");
     }
 }
 

@@ -132,7 +132,7 @@ def train_mnist():
     output_size = 10  # MNIST类别数
     batch_size = 128  # 每次训练的样本数
 
-    # 优化器参数
+    # SGD 优化器参数
     lr = 0.1
     epochs = 10
 
@@ -142,6 +142,7 @@ def train_mnist():
     # Network
     #net = SimpleNet(input_size, hidden_size, output_size, batch_size)
     net = ConvNet(batch_size)
+    #optimizer = SGD(net.params, lr)
     optimizer = Adam(net.params, 0.001)
 
     # 训练

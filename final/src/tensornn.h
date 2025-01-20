@@ -7,6 +7,7 @@
 #include "tensor.h"
 #include "autodiff/operators.h"
 
+/* TensorFunctional - a namespace for functional-style operations on tensors */
 namespace TensorFunctional {
     inline Tensor ReLU(const Tensor& x) {
         std::vector<Value> args = {x.getImpl()};
@@ -34,6 +35,7 @@ namespace TensorFunctional {
     }
 }
 
+/* TensorNN - a namespace for neural network layers */
 namespace TensorNN {
     class Linear {
     public:
