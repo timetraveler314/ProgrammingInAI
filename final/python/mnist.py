@@ -10,6 +10,21 @@ datasets.MNIST.resources = [
     for url, md5 in datasets.MNIST.resources
 ]
 
+def load_mnist():
+    from torchvision import datasets, transforms
+    transform = transforms.Compose([
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0], std=[1])])
+    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    print("MNIST Loaded, with {} training samples and {} testing samples".format(len(train_dataset), len(test_dataset)))
+
+    return train_dataset, train_loader, test_dataset, test_loader
+
 class SimpleNet:
     def __init__(self, input_size, hidden_size, output_size, batch_size):
         # 初始化两层线性网络
@@ -96,17 +111,7 @@ def train_mnist():
     epochs = 10
 
     # 加载MNIST数据
-    from torchvision import datasets, transforms
-    transform = transforms.Compose([
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
-        v2.Normalize(mean=[0], std=[1])])
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-
-    print("MNIST Loaded, with {} training samples and {} testing samples".format(len(train_dataset), len(test_dataset)))
+    train_dataset, train_loader, test_dataset, test_loader = load_mnist()
 
     # Network
     #net = SimpleNet(input_size, hidden_size, output_size, batch_size)
@@ -143,6 +148,7 @@ def train_mnist():
 
                 pbar.set_postfix(loss=total_loss / (batch_idx + 1), accuracy=correct / total_samples)
 
+        # 计算测试集准确率
         test_accuracy = 0
         for test_data, test_target in test_loader:
             test_data_tensor = Tensor.from_numpy(test_data, False)
@@ -150,7 +156,6 @@ def train_mnist():
             test_logits = net.forward(test_data_tensor)
             test_loss = net.loss(test_logits, test_target_tensor)
             test_accuracy += net.accuracy(test_logits, test_target_tensor) * test_data.shape[0]
-
         test_accuracy /= len(test_dataset)
 
         print(f"Finished Epoch {epoch + 1}/{epochs}, Train Loss: {total_loss / len(train_loader)}, Test Accuracy: {test_accuracy}")
