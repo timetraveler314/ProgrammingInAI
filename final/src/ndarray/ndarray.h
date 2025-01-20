@@ -73,12 +73,15 @@ public:
 
     int size() const;
 
+    NdArray operator+(TensorDataType scalar) const;
     friend NdArray operator+(const NdArray& lhs, const NdArray& rhs);
     friend NdArray operator-(const NdArray& lhs, const NdArray& rhs);
     NdArray operator-() const; // Negate
     friend NdArray operator*(const NdArray& lhs, const NdArray& rhs);
     friend NdArray operator*(TensorDataType scalar, const NdArray& tensor);
     friend NdArray operator/(const NdArray& lhs, const NdArray& rhs);
+    NdArray operator^(TensorDataType scalar) const; // Power
+    NdArray operator/(TensorDataType scalar) const; // Division by scalar
 
     // Matrix multiplication
     friend NdArray operator%(const NdArray& lhs, const NdArray& rhs);

@@ -57,6 +57,73 @@ namespace Operators {
         }
     };
 
+    class AddScalar final : public TensorOp {
+    public:
+        TensorDataType scalar;
+
+        explicit AddScalar(const TensorDataType scalar): scalar(scalar) {}
+
+        std::string name() const override {
+            return "<AddScalar by " + std::to_string(scalar) + ">";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            auto& x = args[0];
+            return x + scalar;
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            return {out_grad};
+        }
+    };
+
+    class DivScalar final : public TensorOp {
+    public:
+        TensorDataType scalar;
+
+        explicit DivScalar(const TensorDataType scalar): scalar(scalar) {}
+
+        std::string name() const override {
+            return "<DivScalar by " + std::to_string(scalar) + ">";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            auto& x = args[0];
+            return x / scalar;
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            return {out_grad / scalar};
+        }
+    };
+
+    class PowScalar final : public TensorOp {
+    public:
+        TensorDataType scalar;
+
+        explicit PowScalar(const TensorDataType scalar): scalar(scalar) {}
+
+        std::string name() const override {
+            return "<PowScalar by " + std::to_string(scalar) + ">";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 1);
+            const auto& x = args[0];
+            return x ^ scalar;
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 1);
+            std::cout << "PowScalar gradient" << std::endl;
+            return {scalar * (args[0]->realize() ^ (scalar - 1)) * out_grad};
+        }
+    };
+
     class ReLU final : public TensorOp {
     public:
         std::string name() const override {
@@ -194,6 +261,44 @@ namespace Operators {
         }
     };
 
+    class EWiseMul final : public TensorOp {
+    public:
+        std::string name() const override {
+            return "EWiseMul";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 2);
+            return args[0] * args[1];
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 2);
+            auto x = args[0]->realize();
+            auto y = args[1]->realize();
+            return {out_grad * y, out_grad * x};
+        }
+    };
+
+    class EWiseDiv final : public TensorOp {
+    public:
+        std::string name() const override {
+            return "EWiseDiv";
+        }
+
+        NdArray compute(std::vector<NdArray>& args) const override {
+            assert(args.size() == 2);
+            return args[0] / args[1];
+        }
+
+        std::vector<NdArray> gradient(const NdArray out_grad, std::vector<Value>& args) const override {
+            assert(args.size() == 2);
+            auto x = args[0]->realize();
+            auto y = args[1]->realize();
+            return {out_grad / y, -out_grad * x / (y ^ 2)};
+        }
+    };
+
     class MatMul final : public TensorOp {
     public:
         std::string name() const override {
@@ -219,6 +324,8 @@ namespace Operators {
 
     class Conv2D_3x3 final : public TensorOp {
     public:
+
+
         std::string name() const override {
             return "Conv2D_3x3";
         }

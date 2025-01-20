@@ -73,6 +73,10 @@ public:
         return Tensor(NdArray::xavier(shape, device), require_grad);
     }
 
+    static Tensor zeros_like(const Tensor& other, bool requires_grad = false) {
+        return Tensor(NdArray::zeros_like(other.getImpl()->realize()), requires_grad);
+    }
+
     operator std::shared_ptr<TensorImpl>() const {
         return impl;
     }
@@ -121,9 +125,14 @@ public:
 
     /* Tensor operator/operations */
     Tensor operator+(const Tensor& other) const;
+    friend Tensor operator+(const Tensor& tensor, TensorDataType scalar);
     Tensor operator-() const;
     Tensor operator-(const Tensor& other) const;
     friend Tensor operator*(TensorDataType scalar, const Tensor& tensor);
+    friend Tensor operator*(const Tensor& tensor, const Tensor& other);
+    Tensor operator/(TensorDataType scalar) const;
+    friend Tensor operator/(const Tensor& lhs, const Tensor& rhs);
+    Tensor operator^(TensorDataType scalar) const;
     Tensor operator%(const Tensor& other) const;
 
     Tensor transpose() const;

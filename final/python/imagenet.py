@@ -100,11 +100,11 @@ class MyLeNet:
         hidden_size = 1024
         self.conv1 = nnn.Conv2d_3x3(3, k1)
         self.conv2 = nnn.Conv2d_3x3(k1, k2)
-        self.conv3 = nnn.Conv2d(k2, k3, 7, 2, 3)
-        self.fc1 = nnn.Linear(batch_size, k3 * 8 * 8, hidden_size)
+        # self.conv3 = nnn.Conv2d(k2, k3, 7, 2, 3)
+        self.fc1 = nnn.Linear(batch_size, k2 * 16 * 16, hidden_size)
         self.fc2 = nnn.Linear(batch_size, hidden_size, 200)
 
-        self.params = [self.conv1.kernels, self.conv2.kernels, self.conv3.kernels, self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias]
+        self.params = [self.conv1.kernels, self.conv2.kernels, self.fc1.weight, self.fc1.bias, self.fc2.weight, self.fc2.bias]
 
     def forward(self, x):
         x = self.conv1(x)
@@ -114,8 +114,8 @@ class MyLeNet:
         x = nnn.functional.sigmoid(x)
         x = nnn.functional.maxpool2d(x)
         # shape: [128, 16, 14, 14]
-        x = self.conv3(x)
-        x = nnn.functional.sigmoid(x)
+        # x = self.conv3(x)
+        # x = nnn.functional.sigmoid(x)
         x = x.reshape([x.shape()[0], x.shape()[1] * x.shape()[2] * x.shape()[3]])
         x = self.fc1(x)
         x = nnn.functional.sigmoid(x)

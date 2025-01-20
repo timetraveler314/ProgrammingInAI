@@ -199,6 +199,20 @@ int NdArray::size() const {
     return bufferSize;
 }
 
+NdArray NdArray::operator+(TensorDataType scalar) const {
+    if (device == Device::CPU) {
+        NdArray result(shape, Device::CPU);
+        for (int i = 0; i < size(); i++) {
+            result.getRawData()[i] = getRawData()[i] + scalar;
+        }
+        return result;
+    } else {
+        NdArray result(shape, Device::GPU);
+        thrust::transform(thrust::device, getRawData(), getRawData() + size(), result.getRawData(), [scalar] __device__(TensorDataType x) { return x + scalar; });
+        return result;
+    }
+}
+
 NdArray NdArray::operator-() const {
     if (device == Device::CPU) {
         NdArray result(shape, Device::CPU);
@@ -209,6 +223,34 @@ NdArray NdArray::operator-() const {
     } else {
         NdArray result(shape, Device::GPU);
         thrust::transform(thrust::device, getRawData(), getRawData() + size(), result.getRawData(), thrust::negate<TensorDataType>());
+        return result;
+    }
+}
+
+NdArray NdArray::operator^(TensorDataType scalar) const {
+    if (device == Device::CPU) {
+        NdArray result(shape, Device::CPU);
+        for (int i = 0; i < size(); i++) {
+            result.getRawData()[i] = pow(getRawData()[i], scalar);
+        }
+        return result;
+    } else {
+        NdArray result(shape, Device::GPU);
+        thrust::transform(thrust::device, getRawData(), getRawData() + size(), result.getRawData(), [scalar] __device__(TensorDataType x) { return pow(x, scalar); });
+        return result;
+    }
+}
+
+NdArray NdArray::operator/(TensorDataType scalar) const {
+    if (device == Device::CPU) {
+        NdArray result(shape, Device::CPU);
+        for (int i = 0; i < size(); i++) {
+            result.getRawData()[i] = getRawData()[i] / scalar;
+        }
+        return result;
+    } else {
+        NdArray result(shape, Device::GPU);
+        thrust::transform(thrust::device, getRawData(), getRawData() + size(), result.getRawData(), [scalar] __device__(TensorDataType x) { return x / scalar; });
         return result;
     }
 }
@@ -277,6 +319,26 @@ std::vector<int> NdArray::getShape() const {
     return this->shape;
 }
 
+NdArray operator*(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray addition");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] * y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        thrust::transform(thrust::device, x.getRawData(), x.getRawData() + x.size(), y.getRawData(), result.getRawData(), thrust::multiplies<TensorDataType>());
+        return result;
+    }
+}
+
 NdArray operator*(TensorDataType scalar, const NdArray &tensor) {
     NdArray result(tensor.getShape(), tensor.getDevice());
 
@@ -292,6 +354,26 @@ NdArray operator*(TensorDataType scalar, const NdArray &tensor) {
     }
 
     return result;
+}
+
+NdArray operator/(const NdArray &lhs, const NdArray &rhs) {
+    auto [device, x, y] = NdArray::unifyDevice(lhs, rhs);
+
+    if (x.getShape() != y.getShape()) {
+        throw std::runtime_error("Shape mismatch in NdArray addition");
+    }
+
+    if (device == Device::CPU) {
+        NdArray result(lhs.getShape(), Device::CPU);
+        for (int i = 0; i < result.size(); i++) {
+            result.getRawData()[i] = x.getRawData()[i] / y.getRawData()[i];
+        }
+        return result;
+    } else {
+        NdArray result(lhs.getShape(), Device::GPU);
+        thrust::transform(thrust::device, x.getRawData(), x.getRawData() + x.size(), y.getRawData(), result.getRawData(), thrust::divides<TensorDataType>());
+        return result;
+    }
 }
 
 /*

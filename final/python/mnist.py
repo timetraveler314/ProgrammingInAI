@@ -98,6 +98,32 @@ class SGD:
         for param in self.params:
             param.update(param - self.lr * param.grad())
 
+class Adam:
+    def __init__(self, params, lr, beta1=0.9, beta2=0.999, eps=1e-8):
+        self.params = params
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+
+        self.m = [Tensor.zeros_like(param, False) for param in params]
+        self.v = [Tensor.zeros_like(param, False) for param in params]
+        self.t = 0
+
+    def step(self):
+        self.t += 1
+        for i, param in enumerate(self.params):
+            # detach() prevents computation graph from being built
+            # if we don't detach, the computation graph will be built
+            # and all the intermediate values will be stored in memory
+            self.m[i] = (self.beta1 * self.m[i] + (1 - self.beta1) * param.grad()).detach()
+            self.v[i] = (self.beta2 * self.v[i] + (1 - self.beta2) * param.grad() ** 2.0).detach()
+
+            m_hat = self.m[i] / (1 - self.beta1 ** self.t)
+            v_hat = self.v[i] / (1 - self.beta2 ** self.t)
+
+            param.update(param - self.lr * m_hat / ((v_hat ** 0.5) + self.eps))
+
 
 def train_mnist():
     # 数据参数
@@ -116,7 +142,7 @@ def train_mnist():
     # Network
     #net = SimpleNet(input_size, hidden_size, output_size, batch_size)
     net = ConvNet(batch_size)
-    optimizer = SGD(net.params, lr)
+    optimizer = Adam(net.params, 0.001)
 
     # 训练
     for epoch in range(epochs):

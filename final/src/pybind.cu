@@ -80,6 +80,7 @@ PYBIND11_MODULE(Designant, m) {
             return Tensor(from_numpy(np), requires_grad);
         })
         .def_static("xavier", &Tensor::xavier)
+        .def_static("zeros_like", &Tensor::zeros_like)
         .def("shape", &Tensor::getShape)
         .def("__repr__", [](const Tensor &t) {
             std::string device = t.getDevice() == Device::CPU ? "CPU" : "GPU";
@@ -98,7 +99,12 @@ PYBIND11_MODULE(Designant, m) {
         .def("__add__", &Tensor::operator+)
         .def("__sub__", static_cast<Tensor (Tensor::*)(const Tensor&) const>(&Tensor::operator-))
         .def("__neg__", static_cast<Tensor (Tensor::*)() const>(&Tensor::operator-))
+        .def(py::self + float())
         .def(float() * py::self)
+        .def(py::self / float())
+        .def(py::self * py::self)
+        .def(py::self / py::self)
+        .def("__pow__", &Tensor::operator^)
         .def("__matmul__", &Tensor::operator%)
         .def("transpose", &Tensor::transpose)
         .def("reshape", &Tensor::reshape)

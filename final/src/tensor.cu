@@ -35,8 +35,28 @@ Tensor Tensor::operator-(const Tensor &other) const {
     return *this + (-other);
 }
 
+Tensor Tensor::operator/(TensorDataType scalar) const {
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::DivScalar>(scalar), std::vector{this->to_value()}, this->isRequiresGrad());
+}
+
+Tensor Tensor::operator^(TensorDataType scalar) const {
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::PowScalar>(scalar), std::vector{this->to_value()}, this->isRequiresGrad());
+}
+
+Tensor operator+(const Tensor &tensor, TensorDataType scalar) {
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::AddScalar>(scalar), std::vector{tensor.to_value()}, tensor.isRequiresGrad());
+}
+
 Tensor operator*(TensorDataType scalar, const Tensor &tensor) {
     return std::make_shared<TensorImpl>(std::make_unique<Operators::ScalarProduct>(scalar), std::vector{tensor.to_value()}, tensor.isRequiresGrad());
+}
+
+Tensor operator*(const Tensor &tensor, const Tensor &other) {
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::EWiseMul>(), std::vector{tensor.to_value(), other.to_value()}, tensor.isRequiresGrad() || other.isRequiresGrad());
+}
+
+Tensor operator/(const Tensor &lhs, const Tensor &rhs) {
+    return std::make_shared<TensorImpl>(std::make_unique<Operators::EWiseDiv>(), std::vector{lhs.to_value(), rhs.to_value()}, lhs.isRequiresGrad() || rhs.isRequiresGrad());
 }
 
 Tensor Tensor::operator%(const Tensor &other) const {
